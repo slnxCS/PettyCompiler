@@ -1,0 +1,14 @@
+/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/PettyLang
+/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/PettyLang.deps.json
+/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/PettyLang.runtimeconfig.json
+/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/PettyLang.dll
+/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/PettyLang.pdb
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.GeneratedMSBuildEditorConfig.editorconfig
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.AssemblyInfoInputs.cache
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.AssemblyInfo.cs
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.csproj.CoreCompileInputs.cache
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.dll
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/refint/PettyLang.dll
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.pdb
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/PettyLang.genruntimeconfig.cache
+/home/slnx/PettyLang/Compiler/PettyLang/obj/Debug/net10.0/ref/PettyLang.dll
