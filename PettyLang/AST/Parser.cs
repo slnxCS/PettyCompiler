@@ -123,6 +123,7 @@ public class Parser
             {
                 var id = parseIdentifier();
                 if (AssigmentOperators.Any(x => current.Lexeme == x)) return parseVarAssigment(id);
+                consume(TokenType.Semicolon, "Expected ';'");
                 return new StatementExpression(id);
             }
             case TokenType.Var : return parseVarAssign();
@@ -263,7 +264,7 @@ public class Parser
             case TokenType.IntNumber :
             {
                 advance();
-                return new IntExpression(long.Parse(last.Lexeme), last.Position);
+                return new IntExpression(int.Parse(last.Lexeme), last.Position);
             }
 
             case TokenType.FloatNumber :

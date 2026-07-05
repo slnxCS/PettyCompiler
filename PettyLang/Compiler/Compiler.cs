@@ -6,10 +6,9 @@ namespace PettyLang.Compiler;
 
 public enum OpCode : byte
 {
-    PUSH = 1,
+    PUSH_CONSTANT = 1,
     STORE_LOCAL = 2,
     STORE_GLOBAL = 3,
-    INT = 4,
     LOAD_LOCAL = 5,
     LOAD_GLOBAL = 6,
     
@@ -26,8 +25,10 @@ public class Compiler
         ASTNodes = AST;
     }
 
-    readonly Statement[] ASTNodes;
-    List<byte> compiled = new();
+    private readonly Statement[] ASTNodes;
+    private List<byte> compiled = new();
+    public readonly ConstantPool ConstantPool = new();
+    public int GlobalsLenght { get; private set; } = 0;
 
     static Dictionary<string, OpCode> intOperators = new()
     {
@@ -40,6 +41,9 @@ public class Compiler
     void CompileVarDef(VarDeclStatement var)
     {
         CompileExpression(var.Value);
+        if (var.Resolved.IsGlobal) GlobalsLenght++;
+        Emit(var.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
+        Emit(var.Resolved.ID);
     }
 
     void CompileExpression(Expression ex)
@@ -47,9 +51,8 @@ public class Compiler
         switch (ex)
         {
             case IntExpression _int : 
-                Emit(OpCode.PUSH);
-                Emit(OpCode.INT);
-                Emit((int)_int.Number);
+                Emit(OpCode.PUSH_CONSTANT);
+                Emit(ConstantPool.Add(new IntConstant(_int.Number)));
             break;
             case IdentifierExpression id : 
                 CompileIdentifierExpression(id);
@@ -68,7 +71,7 @@ public class Compiler
         CompileExpression(bin.Left);
         CompileExpression(bin.Right);
 
-        if (bin.LeftSymbol.Type != BuiltIn.IntClass)
+        if (bin.LeftSymbol != BuiltIn.Int32Class || bin.RightSymbol != BuiltIn.Int32Class)
             throw new NotImplementedException();
         
         Emit(intOperators[bin.Operator]);
@@ -87,6 +90,10 @@ public class Compiler
             case VarDeclStatement var : 
                 CompileVarDef(var);
                 break;
+
+            case StatementExpression expr : 
+                CompileExpression(expr.Expression);
+            break;
         }
     }
 

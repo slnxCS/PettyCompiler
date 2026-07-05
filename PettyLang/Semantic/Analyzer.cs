@@ -6,7 +6,7 @@ namespace PettyLang.Semantic;
 public static class BuiltIn {
     private static bool inited = false;
 
-    public static ClassSymbol IntClass = null!, FloatClass = null!, VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
+    public static ClassSymbol Int32Class = null!, Float32Class = null!, VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
     public static ClassSymbol? StringClass = null;
     public static readonly Scope GlobalScope = new(ScopeType.Global, null);
 
@@ -17,13 +17,13 @@ public static class BuiltIn {
 
         ObjectClass = new("Object", default, GlobalScope);
 
-        IntClass = new("int", default, GlobalScope);
-        FloatClass = new("float", default, GlobalScope);
+        Int32Class = new("int32", default, GlobalScope);
+        Float32Class = new("float32", default, GlobalScope);
         VoidClass = new("void", default, GlobalScope);
         FunctionClass = new("function", default, GlobalScope);
 
 
-        StringClass = GlobalScope.GetClass("String", false);
+        StringClass = GlobalScope.GetClass("String", true);
         Define();
     }
 
@@ -45,15 +45,15 @@ public static class BuiltIn {
 
     public static void Define()
     {
-        GlobalScope.DefineClass(IntClass);
-        GlobalScope.DefineClass(FloatClass);
+        GlobalScope.DefineClass(Int32Class);
+        GlobalScope.DefineClass(Float32Class);
         GlobalScope.DefineClass(VoidClass);
         if (StringClass != null) GlobalScope.DefineClass(StringClass);
 
         var printFunc = new FunctionSymbol("print", GlobalScope);
         GlobalScope.DefineFunc(printFunc);
         AddOverload(printFunc, createParams(("text", StringClass!)), VoidClass);
-        AddOverload(printFunc, createParams(("num", IntClass)), VoidClass);
+        AddOverload(printFunc, createParams(("num", Int32Class)), VoidClass);
     }
 }
 
@@ -94,6 +94,29 @@ public class Analyzer
         }
     }
 
+    FunctionParameter[] ResolveParams(FuncParameter[] parameters)
+    {
+        var @params = new FunctionParameter[parameters.Length];
+        for (int i = 0; i < @params.Length; i++)
+        {
+            @params[i] = new(parameters[i].Name, parameters[i].Position, GetSymType(ResolveExpression(parameters[i].Type)));
+        }
+
+        return @params;
+    }
+
+    FunctionOverload ResolveFuncDecl(FuncDefineStatement func)
+    {
+        var fs = currentScope.GetFunc(func.Name, false);
+        if (fs == null) fs = new (func.Name, currentScope);
+
+        var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null? BuiltIn.VoidClass : 
+                GetSymType(ResolveExpression(func.ReturnType)));
+
+        fs.AddOverload(ov);
+        return ov;
+    }
+
     void VisitVarDef(VarDeclStatement varDecl)
     {
         var resolved = ResolveExpression(varDecl.Value);
@@ -116,11 +139,11 @@ public class Analyzer
     {
         switch (expr)
         {
-            case IntExpression : return BuiltIn.IntClass;
-            case FloatExpression : return BuiltIn.FloatClass;
+            case IntExpression : return BuiltIn.Int32Class;
+            case FloatExpression : return BuiltIn.Float32Class;
             case StringExpression : return BuiltIn.StringClass ?? throw new NotImplementedException("string");
             case IdentifierExpression id : return ResolveIdentifierExpression(id);
-            case IdentifierExpressionPart idPart : return ResolveIdentifierPart(idPart, currentScope, false);
+            case IdentifierExpressionPart idPart : return ResolveIdentifierPart(idPart, currentScope, false, null);
             case BinaryExpression bin : return ResolveBin(bin);
             default : throw new NotImplementedException($"{expr}");
         }
@@ -163,19 +186,21 @@ public class Analyzer
         return res_args;
     }
 
-    Symbol ResolveIdentifierPart(IdentifierExpressionPart part, Scope lookingScope, bool local)
+    Symbol ResolveIdentifierPart(IdentifierExpressionPart part, Scope lookingScope, bool local, Symbol? lastSym)
     {
+        var errorMsg = lastSym == null ? $"Name '{part.ID}' does not exist in current context"
+            : $"Class '{lastSym.GetFullName()}' does not contains field with name '{part.ID}'";
         if (part.FuncCallsArguments.Length == 0)
         {
             var _v = lookingScope.GetVar(part.ID, local);
             if (_v != null) return _v;
-            return lookingScope.GetClass(part.ID, local) ?? throw new Error($"Name '{part.ID}' does not exist in current context", "Semantic", part.Position);
+            return lookingScope.GetClass(part.ID, local) ?? throw new Error(errorMsg, "Semantic", part.Position);
         }
         else
         {
             var sym = lookingScope.GetFunc(part.ID, local);
             if (sym == null) 
-                throw new Error($"Function '{part.ID}' does not exist in current context", "Semantic", part.Position);
+                throw new Error(errorMsg, "Semantic", part.Position);
             //for (int i = 0; i < part.FuncCallsArguments.Length; i++)
             //{
                 var args = part.FuncCallsArguments[0];
@@ -197,7 +222,7 @@ public class Analyzer
                 throw new Exception($"Cannot use operator '::' to '{sym.GetFullName()}'");
             lookingScope = cl.Members;
             var part = identifier.OtherParts[i];
-            sym = ResolveIdentifierPart(part, lookingScope, true);
+            sym = ResolveIdentifierPart(part, lookingScope, true, sym);
         }
 
         identifier.Resolved = sym;

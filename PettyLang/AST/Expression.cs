@@ -4,9 +4,9 @@ namespace PettyLang.AST;
 
 public abstract class Expression(Position position) : ASTNode(position);
 
-public class IntExpression(long number, Position position) : Expression(position)
+public class IntExpression(int number, Position position) : Expression(position)
 {
-    public readonly long Number = number;
+    public readonly int Number = number;
 }
 
 public class FloatExpression(double number, Position position) : Expression(position)

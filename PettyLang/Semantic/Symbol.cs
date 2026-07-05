@@ -9,7 +9,7 @@ public abstract class Symbol
         Name = name;
         Position = position;
         DeclaredIn = declaredIn;
-        ID = declaredIn.GetID();
+        ID = declaredIn.GetFreeID();
         Type = type;
     }
 

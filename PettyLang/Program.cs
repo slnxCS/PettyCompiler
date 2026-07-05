@@ -7,6 +7,8 @@ namespace PettyLang;
 
 public class Program
 {
+    public const double VERSION = 0.1f;
+
     public static string FilePath = "";
 
     public static void Main(string[] args)
@@ -24,6 +26,8 @@ public class Program
 
         FilePath = filePath;
 
+        var outputName = "compiled.pt";
+
         var source = File.ReadAllText(filePath);
 
         //try 
@@ -32,8 +36,11 @@ public class Program
             var parser = new Parser.Parser(source);
             var AST = parser.Parse();
             new Analyzer().Analyze(AST);
-            var compiled = new Compiler.Compiler(AST).Comiple();
-            File.WriteAllBytes("test_compiled", compiled);
+            var compiler = new Compiler.Compiler(AST);
+            var byteCode = compiler.Comiple();
+            var globalsLenght = compiler.GlobalsLenght;
+            var compiled = new HeaderCompiler(globalsLenght, compiler.ConstantPool).CompileWithByteCode(byteCode);
+            File.WriteAllBytes(outputName, compiled);
         //}
         //catch (Error error)
         //{
