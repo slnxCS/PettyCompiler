@@ -22,9 +22,9 @@ public class Scope
     private Dictionary<string, FunctionSymbol> functions = new();
     private Dictionary<string, ClassSymbol> classes = new();
     
-    private static ulong globalFreeID = 0;
+    private static int globalFreeID = 0;
 
-    public ulong GetFreeID()
+    public int GetFreeID()
     {
         return globalFreeID++;
     }

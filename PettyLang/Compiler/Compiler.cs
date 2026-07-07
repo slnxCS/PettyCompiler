@@ -16,6 +16,8 @@ public enum OpCode : byte
     SUB_INT = 11,
     DIV_INT = 12,
     MUL_INT = 13,
+
+    HALT = 15,
 }
 
 public class Compiler
@@ -26,7 +28,8 @@ public class Compiler
     }
 
     private readonly Statement[] ASTNodes;
-    private List<byte> compiled = new();
+    private readonly BinaryWriter compilerWriter = new();
+    public readonly BinaryWriter globalWriter = new();
     public readonly ConstantPool ConstantPool = new();
     public int GlobalsLenght { get; private set; } = 0;
 
@@ -40,33 +43,43 @@ public class Compiler
 
     void CompileVarDef(VarDeclStatement var)
     {
-        CompileExpression(var.Value);
-        if (var.Resolved.IsGlobal) GlobalsLenght++;
-        Emit(var.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
-        Emit(var.Resolved.ID);
+        if (var.Resolved.IsGlobal)
+        {
+            CompileExpression(var.Value, globalWriter);
+            compilerWriter.Emit(OpCode.STORE_GLOBAL);
+        }
+        else
+        {
+            CompileExpression(var.Value, compilerWriter);
+            compilerWriter.Emit(OpCode.STORE_LOCAL);
+        }
+
+        compilerWriter.Emit(var.Resolved.ID);
     }
 
-    void CompileExpression(Expression ex)
+    void CompileExpression(Expression ex, IBinaryWriter? writer = null)
     {
+        if (writer == null)
+            writer = compilerWriter;
         switch (ex)
         {
             case IntExpression _int : 
-                Emit(OpCode.PUSH_CONSTANT);
-                Emit(ConstantPool.Add(new IntConstant(_int.Number)));
+                writer.Emit(OpCode.PUSH_CONSTANT);
+                writer.Emit(ConstantPool.Add(new IntConstant(_int.Number)));
             break;
             case IdentifierExpression id : 
-                CompileIdentifierExpression(id);
+                CompileIdentifierExpression(id,  writer);
             break;
 
             case BinaryExpression bin :
-                CompileBinary(bin);
+                CompileBinary(bin, writer);
             break;
 
             default : throw new NotImplementedException(ex.ToString());
         }
     }
 
-    void CompileBinary(BinaryExpression bin)
+    void CompileBinary(BinaryExpression bin, IBinaryWriter writer)
     {
         CompileExpression(bin.Left);
         CompileExpression(bin.Right);
@@ -74,13 +87,13 @@ public class Compiler
         if (bin.LeftSymbol != BuiltIn.Int32Class || bin.RightSymbol != BuiltIn.Int32Class)
             throw new NotImplementedException();
         
-        Emit(intOperators[bin.Operator]);
+        writer.Emit(intOperators[bin.Operator]);
     }
 
-    void CompileIdentifierExpression(IdentifierExpression id)
+    void CompileIdentifierExpression(IdentifierExpression id, IBinaryWriter writer)
     {
-        Emit(id.Resolved.IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL);
-        Emit(id.Resolved.ID);
+        writer.Emit(id.Resolved.IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL);
+        writer.Emit(id.Resolved.ID);
     }
 
     void CompileStatement(Statement st)
@@ -95,22 +108,7 @@ public class Compiler
                 CompileExpression(expr.Expression);
             break;
         }
-    }
-
-    public void Emit(OpCode code)
-    {
-        compiled.Add((byte)code);
-    }
-
-    public void Emit(int value)
-    {
-        compiled.AddRange(BitConverter.GetBytes(value));
-    }
-
-    public void Emit(ulong value)
-    {
-        compiled.AddRange(BitConverter.GetBytes(value));
-    }
+    }    
 
     void CompileStatements(Statement[] sts)
     {
@@ -118,11 +116,12 @@ public class Compiler
         {
             CompileStatement(st);
         }
+        compilerWriter.WriteByte((byte)OpCode.HALT);
     }
 
     public byte[] Comiple()
     {
         CompileStatements(ASTNodes);
-        return compiled.ToArray();
+        return compilerWriter.GetWritedBytesArray();
     }
 }

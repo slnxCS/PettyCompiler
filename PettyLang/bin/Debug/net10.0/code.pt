@@ -1,1 +1,2 @@
-var x : int32 = 10;
+var x : int32 = 20 + 20 * 2;
+var y = x;

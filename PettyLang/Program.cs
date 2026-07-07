@@ -35,11 +35,10 @@ public class Program
             
             var parser = new Parser.Parser(source);
             var AST = parser.Parse();
-            new Analyzer().Analyze(AST);
-            var compiler = new Compiler.Compiler(AST);
-            var byteCode = compiler.Comiple();
-            var globalsLenght = compiler.GlobalsLenght;
-            var compiled = new HeaderCompiler(globalsLenght, compiler.ConstantPool).CompileWithByteCode(byteCode);
+            var analyzer = new Analyzer();
+            analyzer.Analyze(AST);
+            var compiler = new CompileFabric(AST);
+            var compiled = compiler.Build();
             File.WriteAllBytes(outputName, compiled);
         //}
         //catch (Error error)

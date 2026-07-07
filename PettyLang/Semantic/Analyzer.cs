@@ -60,6 +60,7 @@ public static class BuiltIn {
 public class Analyzer
 {
     private Scope currentScope = BuiltIn.GlobalScope;
+    public static FunctionOverload? MainFunction;
 
     public Analyzer()
     {
@@ -72,6 +73,11 @@ public class Analyzer
         {
             VisitStatement(statement);
         }
+
+        if (MainFunction == null)
+        {
+            throw new Error("Program should have Main Function", "Semantic", default);
+        }
     }
 
     void VisitStatement(Statement statement)
@@ -81,6 +87,12 @@ public class Analyzer
             case StatementExpression expr :
             {
                 VisitStatementExpression(expr);
+                break;
+            }
+
+            case FuncDefineStatement funcDef :
+            {
+                ResolveFuncDecl(funcDef);
                 break;
             }
 
@@ -114,6 +126,24 @@ public class Analyzer
                 GetSymType(ResolveExpression(func.ReturnType)));
 
         fs.AddOverload(ov);
+
+        if (fs.Name == "Main")
+        {
+            if (MainFunction != null) 
+            {
+                throw new Error("Main entry point is already exist in this program", "Semantic", ov.Position);
+            }
+            if (ov.ReturnType != BuiltIn.VoidClass)
+            {
+                throw new Error("Main function must return void", "Semantic", ov.Position);
+            }
+            if (ov.Arity != 0)
+            {
+                throw new Error("Main function should not take any parameters", "Semantic", ov.Position);
+            }
+
+            MainFunction = ov;
+        }
         return ov;
     }
 

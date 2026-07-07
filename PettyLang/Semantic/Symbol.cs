@@ -16,7 +16,7 @@ public abstract class Symbol
     public readonly string Name;
     public readonly Position Position;
     public readonly Scope DeclaredIn;
-    public readonly ulong ID;
+    public readonly int ID;
     public ClassSymbol Type;
 
     public bool IsGlobal => DeclaredIn.Type == ScopeType.Global;
