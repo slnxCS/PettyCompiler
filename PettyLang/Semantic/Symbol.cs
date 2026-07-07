@@ -4,12 +4,12 @@ namespace PettyLang.Semantic;
 
 public abstract class Symbol
 {
-    protected Symbol(string name, Position position, Scope declaredIn, ClassSymbol type)
+    protected Symbol(string name, Position position, Scope declaredIn, ClassSymbol type, int? id = null)
     {        
         Name = name;
         Position = position;
         DeclaredIn = declaredIn;
-        ID = declaredIn.GetFreeID();
+        ID = id ?? declaredIn.GetFreeID();
         Type = type;
     }
 
@@ -36,8 +36,22 @@ public class VarSymbol(string name, Position position, Scope declaredIn, ClassSy
 {
 }
 
-public class FunctionSymbol(string name, Scope declaredIn) : Symbol(name, default, declaredIn, BuiltIn.FunctionClass)
+public class BuiltInFunctionSymbol(string name, Scope declaredIn, int index) : FunctionSymbol(name, declaredIn, index)
 {
+}
+
+public class FunctionSymbol : Symbol
+{
+    public FunctionSymbol(string name, Scope declaredIn) : base(name, default, declaredIn, BuiltIn.FunctionClass)
+    {
+        
+    }
+
+    protected FunctionSymbol(string name, Scope declaredIn, int builtin_index) : base(name, default, declaredIn, BuiltIn.FunctionClass, builtin_index)
+    {
+        
+    }
+
     private readonly List<FunctionOverload> Overloads = new();
 
     public FunctionOverload GetOverload(FunctionParameter[] parameters, bool throws, Position position = default)
@@ -133,6 +147,7 @@ public class FunctionSymbol(string name, Scope declaredIn) : Symbol(name, defaul
 
 public class FunctionParameter(string name, Position position, ClassSymbol type)
 {
+
     public readonly string Name = name;
     public readonly Position Position = position;
     public readonly ClassSymbol Type = type;

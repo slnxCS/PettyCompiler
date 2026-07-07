@@ -50,9 +50,8 @@ public static class BuiltIn {
         GlobalScope.DefineClass(VoidClass);
         if (StringClass != null) GlobalScope.DefineClass(StringClass);
 
-        var printFunc = new FunctionSymbol("print", GlobalScope);
+        var printFunc = new BuiltInFunctionSymbol("print", GlobalScope, 0);
         GlobalScope.DefineFunc(printFunc);
-        AddOverload(printFunc, createParams(("text", StringClass!)), VoidClass);
         AddOverload(printFunc, createParams(("num", Int32Class)), VoidClass);
     }
 }
@@ -76,7 +75,7 @@ public class Analyzer
 
         if (MainFunction == null)
         {
-            throw new Error("Program should have Main Function", "Semantic", default);
+            //throw new Error("Program should have Main Function", "Semantic", default);
         }
     }
 
@@ -223,19 +222,27 @@ public class Analyzer
         if (part.FuncCallsArguments.Length == 0)
         {
             var _v = lookingScope.GetVar(part.ID, local);
-            if (_v != null) return _v;
-            return lookingScope.GetClass(part.ID, local) ?? throw new Error(errorMsg, "Semantic", part.Position);
+            if (_v != null) 
+            {
+                part.Resolved = _v;
+                return _v;
+            }
+            var _c = lookingScope.GetClass(part.ID, local) ?? throw new Error(errorMsg, "Semantic", part.Position);
+            part.Resolved = _c;
+            return _c;
         }
         else
         {
             var sym = lookingScope.GetFunc(part.ID, local);
             if (sym == null) 
                 throw new Error(errorMsg, "Semantic", part.Position);
+            part.Resolved = sym;
             //for (int i = 0; i < part.FuncCallsArguments.Length; i++)
             //{
                 var args = part.FuncCallsArguments[0];
                 var resolved = ResolveArgs(args);
                 var ov = sym.GetOverload(resolved, true, part.Position);
+                part.ResolvedOverload = ov;
             //}
             return ov.ReturnType;
         }

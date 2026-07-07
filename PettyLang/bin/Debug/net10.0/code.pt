@@ -1,2 +1,2 @@
-var x : int32 = 20 + 20 * 2;
-var y = x;
+var x = 500 * 20;
+print(10);

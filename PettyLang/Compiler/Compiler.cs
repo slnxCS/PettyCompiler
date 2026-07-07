@@ -11,6 +11,8 @@ public enum OpCode : byte
     STORE_GLOBAL = 3,
     LOAD_LOCAL = 5,
     LOAD_GLOBAL = 6,
+
+    SYS_CALL = 4,
     
     ADD_INT = 10,
     SUB_INT = 11,
@@ -29,7 +31,7 @@ public class Compiler
 
     private readonly Statement[] ASTNodes;
     private readonly BinaryWriter compilerWriter = new();
-    public readonly BinaryWriter globalWriter = new();
+    public readonly BinaryWriter GlobalWriter = new();
     public readonly ConstantPool ConstantPool = new();
     public int GlobalsLenght { get; private set; } = 0;
 
@@ -45,16 +47,18 @@ public class Compiler
     {
         if (var.Resolved.IsGlobal)
         {
-            CompileExpression(var.Value, globalWriter);
-            compilerWriter.Emit(OpCode.STORE_GLOBAL);
+            CompileExpression(var.Value, GlobalWriter);
+            GlobalWriter.Emit(OpCode.STORE_GLOBAL);
+            GlobalWriter.Emit(var.Resolved.ID);
         }
         else
         {
             CompileExpression(var.Value, compilerWriter);
             compilerWriter.Emit(OpCode.STORE_LOCAL);
+            compilerWriter.Emit(var.Resolved.ID);
         }
 
-        compilerWriter.Emit(var.Resolved.ID);
+        
     }
 
     void CompileExpression(Expression ex, IBinaryWriter? writer = null)
@@ -75,14 +79,18 @@ public class Compiler
                 CompileBinary(bin, writer);
             break;
 
+            case IdentifierExpressionPart idPart :
+                CompileIdentifierExpressionPart(idPart, writer);
+            break;
+
             default : throw new NotImplementedException(ex.ToString());
         }
     }
 
     void CompileBinary(BinaryExpression bin, IBinaryWriter writer)
     {
-        CompileExpression(bin.Left);
-        CompileExpression(bin.Right);
+        CompileExpression(bin.Left, writer);
+        CompileExpression(bin.Right, writer);
 
         if (bin.LeftSymbol != BuiltIn.Int32Class || bin.RightSymbol != BuiltIn.Int32Class)
             throw new NotImplementedException();
@@ -90,10 +98,34 @@ public class Compiler
         writer.Emit(intOperators[bin.Operator]);
     }
 
+    void CompileIdentifierExpressionPart(IdentifierExpressionPart part, IBinaryWriter writer)
+    {
+        var sym = part.Resolved;
+
+        if (sym is VarSymbol var)
+        {
+            writer.Emit(var.IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL);
+            writer.Emit(var.ID);
+        }
+        else if (sym is FunctionSymbol func)
+        {
+            foreach (var arg in part.FuncCallsArguments[0])
+            {
+                CompileExpression(arg, writer);
+            }
+            
+            if (sym is BuiltInFunctionSymbol biFunc)
+            {
+                writer.Emit(OpCode.SYS_CALL);
+                writer.Emit(biFunc.ID);
+            }
+            else throw new NotImplementedException();
+        }
+    }
+
     void CompileIdentifierExpression(IdentifierExpression id, IBinaryWriter writer)
     {
-        writer.Emit(id.Resolved.IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL);
-        writer.Emit(id.Resolved.ID);
+        CompileExpression(id.FirstPart, writer);
     }
 
     void CompileStatement(Statement st)
@@ -116,7 +148,6 @@ public class Compiler
         {
             CompileStatement(st);
         }
-        compilerWriter.WriteByte((byte)OpCode.HALT);
     }
 
     public byte[] Comiple()
