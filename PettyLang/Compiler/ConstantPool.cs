@@ -6,6 +6,7 @@ namespace PettyLang.Compiler;
 public enum ConstantType : byte
 {
     CONSTANT_INT = 0,
+    CONSTANT_FLOAT = 1,
 }
 
 public abstract record Constant(ConstantType type)
@@ -13,6 +14,14 @@ public abstract record Constant(ConstantType type)
     public abstract byte[] GetBytes();
 }
 public record IntConstant(int value) : Constant(ConstantType.CONSTANT_INT)
+{
+    public override byte[] GetBytes()
+    {
+        return BitConverter.GetBytes(value);
+    }
+}
+
+public record FloatConstant(float value) : Constant(ConstantType.CONSTANT_FLOAT)
 {
     public override byte[] GetBytes()
     {

@@ -1,16 +1,17 @@
 namespace PettyLang.Compiler;
 
-public interface IBinaryWriter
+public interface IByteWriter
 {
     public void WriteByte(byte b);
     public void Emit(OpCode opCode);
     public void Emit(int number);
+    public void Emit(float number);
 
     public IReadOnlyList<byte> GetWritedBytes();
     public byte[] GetWritedBytesArray();
 }
 
-public class BinaryWriter : IBinaryWriter
+public class ByteWriter : IByteWriter
 {
     private List<byte> writed = new();
 
@@ -22,6 +23,11 @@ public class BinaryWriter : IBinaryWriter
     }
 
     public void Emit(int number)
+    {
+        writed.AddRange(BitConverter.GetBytes(number));
+    }
+
+    public void Emit(float number)
     {
         writed.AddRange(BitConverter.GetBytes(number));
     }

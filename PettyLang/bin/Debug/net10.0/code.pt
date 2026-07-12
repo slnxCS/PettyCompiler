@@ -1,2 +1,16 @@
-var x = 500 * 20;
-print(10);
+var negativeZero = 1 - 2;
+
+func sum(a : float32, b : float32) : float32 {
+    return a + b;
+}
+
+func sum(a : int32, b : int32) : int32 {
+    return a + b;
+}
+
+func Main() : {
+    var x = sum(10,20);
+    var y = sum(12.12, 2043.2);
+    print(x);
+    print(y);
+}

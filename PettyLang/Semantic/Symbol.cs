@@ -1,16 +1,23 @@
+using PettyLang.AST;
 using PettyLang.Errors;
 
 namespace PettyLang.Semantic;
 
 public abstract class Symbol
 {
-    protected Symbol(string name, Position position, Scope declaredIn, ClassSymbol type, int? id = null)
+    protected Symbol(string name, Position position, Scope declaredIn, ClassSymbol? type, int? id = null)
     {        
         Name = name;
         Position = position;
         DeclaredIn = declaredIn;
-        ID = id ?? declaredIn.GetFreeID();
-        Type = type;
+        ID = id ?? this switch
+        {
+            VarSymbol => declaredIn.GetFreeVarID(),
+            FunctionSymbol => -1,
+            ClassSymbol => declaredIn.GetFreeClassID(),
+            _ => throw new NotImplementedException(GetType().Name)
+        };
+        Type = type ?? (this is ClassSymbol c ? c : BuiltIn.ObjectClass);
     }
 
     public readonly string Name;
@@ -27,27 +34,19 @@ public abstract class Symbol
     }
 }
 
-public class ClassSymbol(string name, Position position, Scope declaredIn) : Symbol(name, position, declaredIn, BuiltIn.ObjectClass)
+public class ClassSymbol(string name, Position position, Scope declaredIn) : Symbol(name, position, declaredIn, null)
 {
     public readonly Scope Members = /*null!*/ new(ScopeType.Class, declaredIn);
 }
 
 public class VarSymbol(string name, Position position, Scope declaredIn, ClassSymbol type) : Symbol(name, position, declaredIn, type)
 {
-}
-
-public class BuiltInFunctionSymbol(string name, Scope declaredIn, int index) : FunctionSymbol(name, declaredIn, index)
-{
+    public bool isArg = false;
 }
 
 public class FunctionSymbol : Symbol
 {
     public FunctionSymbol(string name, Scope declaredIn) : base(name, default, declaredIn, BuiltIn.FunctionClass)
-    {
-        
-    }
-
-    protected FunctionSymbol(string name, Scope declaredIn, int builtin_index) : base(name, default, declaredIn, BuiltIn.FunctionClass, builtin_index)
     {
         
     }
@@ -131,14 +130,12 @@ public class FunctionSymbol : Symbol
     public void AddOverload(FunctionOverload ov)
     {
         ov.Parent = this;
-        if (Overloads.Count == 0) 
-        {
-            Overloads.Add(ov);
-            return;
-        }
+        if (ov is not BuiltInFunctionOverload)
+            ov.ID = DeclaredIn.GetFreeFuncID();
 
         if (ContainsOverload(ov)) 
-            throw new Error($"Overload of function '{Name}' with same parameters({new string(string.Join(',', ov.Parameters).Skip(1).ToArray())}) is already exist", "Semantic",
+            throw new Error($"Overload of function '{Name}' with same parameters({new string(string.Join(", ", ov.Parameters).ToArray())}) is already exist", 
+                "Semantic",
                 ov.Position);
         
         Overloads.Add(ov);
@@ -154,15 +151,44 @@ public class FunctionParameter(string name, Position position, ClassSymbol type)
 
     public override string ToString()
     {
-        return $"{Name + (Name != "" ? ":" : "")} {Type.GetFullName()}";
+        return $"{Name + (Name != "" ? " :" : "")} {Type.GetFullName()}";
     }
 }
 
-public class FunctionOverload(FunctionParameter[] @params, Position position, ClassSymbol returnType)
+public class BuiltInFunctionOverload : FunctionOverload
 {
-    public readonly Position Position = position;
+    public BuiltInFunctionOverload(FunctionParameter[] @params, ClassSymbol returnType, int id)
+        : base(@params, default, returnType, null, id)
+    {
+        
+    }
+}
+
+public class FunctionOverload
+{
+    public FunctionOverload(FunctionParameter[] @params, Position position, ClassSymbol returnType, FuncDefineStatement? statement)
+    {
+        Position = position;
+        Parameters = @params;
+        ReturnType = returnType;
+        Statement = statement;
+    }
+
+    protected FunctionOverload(FunctionParameter[] @params, Position position, ClassSymbol returnType, FuncDefineStatement? statement, int id)
+    {
+        Position = position;
+        Parameters = @params;
+        ReturnType = returnType;
+        Statement = statement;
+        ID = id;
+    }
+
+    public int ID;
+    public int LocalsCount;
+    public readonly Position Position;
     public FunctionSymbol Parent = null!;
-    public readonly FunctionParameter[] Parameters = @params;
+    public readonly FunctionParameter[] Parameters;
     public int Arity => Parameters.Length;
-    public readonly ClassSymbol ReturnType = returnType;
+    public readonly ClassSymbol ReturnType;
+    public readonly FuncDefineStatement? Statement;
 }

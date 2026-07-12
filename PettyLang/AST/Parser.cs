@@ -103,7 +103,15 @@ public class Parser
 
         var block = parseBlock();
 
-        return new(new(startPos, endPos), name, parameters, retType);
+        return new(new(startPos, endPos), name, parameters, retType, block);
+    }
+
+    private ReturnStatement parseReturn()
+    {
+        var startPos = consume(TokenType.Return, "Expected return keyword").Position.Start;
+        Expression? value = match(TokenType.Semicolon) ? null : parseExpression();
+        var endPos = value == null ? last.Position.End : consume(TokenType.Semicolon, "Expected ';' after return value").Position.End;
+        return new(value, new Position(startPos, endPos));
     }
 
     private VarAssigmentStatement parseVarAssigment(IdentifierExpression target)
@@ -129,6 +137,7 @@ public class Parser
             case TokenType.Var : return parseVarAssign();
             case TokenType.LCurlyBrace : return parseBlock();
             case TokenType.Func : return parseFuncDef();
+            case TokenType.Return : return parseReturn();
             default : throw new Error($"Unexpected '{current.Type}'", "Syntax", current.Position);
         }
     }
@@ -270,7 +279,7 @@ public class Parser
             case TokenType.FloatNumber :
             {
                 advance();
-                return new FloatExpression(double.Parse(last.Lexeme), last.Position);
+                return new FloatExpression(float.Parse(last.Lexeme), last.Position);
             }
 
             case TokenType.String :
@@ -284,12 +293,23 @@ public class Parser
                 return parseIdentifierPart();
             }
 
-            default : throw new Error("Expected expression", "Syntax", current.Position);
+            case TokenType.LParen :
+            {
+                var startPos = current.Position.Start;
+                advance();
+                var val = parseExpression();
+                var endPos = consume(TokenType.RParen, "Expected ')'").Position.End;
+                val.Position = new(startPos, endPos);
+                return val;
+            }
+
+            default : throw new Error($"Unexpected '{current.Lexeme}' in expression", "Syntax", current.Position);
         }
     }
 
     public Statement[] Parse()
     {
+        
         nodes.Clear();
         position = 0;
 

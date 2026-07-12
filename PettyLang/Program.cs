@@ -38,7 +38,7 @@ public class Program
             var analyzer = new Analyzer();
             analyzer.Analyze(AST);
             var compiler = new CompileFabric(AST);
-            var compiled = compiler.Build();
+            var compiled = compiler.Build(analyzer);
             File.WriteAllBytes(outputName, compiled);
         //}
         //catch (Error error)

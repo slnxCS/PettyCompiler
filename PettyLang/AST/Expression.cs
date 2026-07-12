@@ -9,9 +9,9 @@ public class IntExpression(int number, Position position) : Expression(position)
     public readonly int Number = number;
 }
 
-public class FloatExpression(double number, Position position) : Expression(position)
+public class FloatExpression(float number, Position position) : Expression(position)
 {
-    public readonly double Number = number;
+    public readonly float Number = number;
 }
 
 public class StringExpression(string str, Position position) : Expression(position)

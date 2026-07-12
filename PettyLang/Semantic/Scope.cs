@@ -1,3 +1,4 @@
+using System.Security.Cryptography.X509Certificates;
 using PettyLang.Errors;
 
 namespace PettyLang.Semantic;
@@ -13,6 +14,10 @@ public class Scope
     {
         Parent = parent;
         Type = type;
+
+        if (Type == ScopeType.Global || Parent == null) freeIDSet = GlobalFreeIDSet;
+        else if (Parent.Type == ScopeType.Global) freeIDSet = new();
+        else freeIDSet = Parent.freeIDSet;
     }
 
     public readonly Scope? Parent;
@@ -22,11 +27,29 @@ public class Scope
     private Dictionary<string, FunctionSymbol> functions = new();
     private Dictionary<string, ClassSymbol> classes = new();
     
-    private static int globalFreeID = 0;
-
-    public int GetFreeID()
+    public class IDSet
     {
-        return globalFreeID++;
+        public int FreeVarID;
+        public int FreeFuncID;
+        public int FreeClassID;
+    }
+
+    public static IDSet GlobalFreeIDSet = new();
+    private IDSet freeIDSet;
+
+    public int GetFreeVarID()
+    {
+        return freeIDSet.FreeVarID++;
+    }
+
+    public int GetFreeFuncID()
+    {
+        return GlobalFreeIDSet.FreeFuncID++;
+    }
+
+    public int GetFreeClassID()
+    {
+        return freeIDSet.FreeClassID++;
     }
 
     public VarSymbol? GetVar(string name, bool local)

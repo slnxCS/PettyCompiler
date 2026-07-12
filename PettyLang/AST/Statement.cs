@@ -22,6 +22,8 @@ public class VarAssigmentStatement(Position position, IdentifierExpression targe
     public readonly IdentifierExpression Target = target;
     public readonly string Operator = @operator;
     public readonly Expression Value = value;
+
+    public VarSymbol? Resolved = null;
 }
 
 public class BlockStatement(Position position, Statement[] statements) : Statement(position)
@@ -34,11 +36,20 @@ public class FuncParameter(Position position, string name, IdentifierExpression 
     public readonly Position Position = position;
     public readonly string Name = name;
     public readonly IdentifierExpression Type = type;
+    public FunctionParameter? Resolved = null;
 }
 
-public class FuncDefineStatement(Position position, string name, FuncParameter[] parameters, IdentifierExpression? returnType) : Statement(position)
+public class FuncDefineStatement
+    (Position position, string name, FuncParameter[] parameters, IdentifierExpression? returnType, BlockStatement block) : Statement(position)
 {
     public readonly string Name = name;
     public readonly FuncParameter[] Parameters = parameters;
     public readonly IdentifierExpression? ReturnType = returnType;
+    public readonly BlockStatement Block = block;
+    public FunctionOverload? Resolved = null;
+}
+
+public class ReturnStatement(Expression? value, Position position) : Statement(position)
+{
+    public readonly Expression? Value = value;
 }

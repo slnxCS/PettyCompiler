@@ -35,6 +35,7 @@ public class Lexer(string source)
         {"var", TokenType.Var},
         {"import", TokenType.Import},
         {"package", TokenType.Package},
+        {"return", TokenType.Return},
     }, 
     Symbols = new()
     {
