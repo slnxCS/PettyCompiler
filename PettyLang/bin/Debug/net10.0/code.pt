@@ -1,16 +1,24 @@
-var negativeZero = 1 - 2;
-
-func sum(a : float32, b : float32) : float32 {
-    return a + b;
+# Третья функция: проверяем локальные переменные
+func Third(a : int32) : int32 {
+    var temp = 100;
+    return a + temp;
 }
 
-func sum(a : int32, b : int32) : int32 {
-    return a + b;
+# Вторая функция: проверяем передачу двух аргументов
+func Second(a : int32, b : int32) : int32 {
+    var temp = 5;
+    var res = Third(a + b);
+    return res + temp;
 }
 
-func Main() : {
-    var x = sum(10,20);
-    var y = sum(12.12, 2043.2);
-    print(x);
-    print(y);
+# Первая функция: проверяем изоляцию кадра
+func First(x : int32) : int32 {
+    var temp = 10;
+    return Second(temp, x); 
+}
+
+# Главная функция возвращает void
+func Main() : void {
+    var finalResult = First(5);
+    print(finalResult); # На выходе в консоли должно быть ровно 120
 }

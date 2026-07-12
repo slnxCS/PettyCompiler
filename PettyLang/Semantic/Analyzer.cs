@@ -57,6 +57,9 @@ public static class BuiltIn {
         var toFloatFunc = new FunctionSymbol("ToFloat", Int32Class.Members);
         Int32Class.Members.DefineFunc(toFloatFunc);
         AddOverload(toFloatFunc, createParams(("number", Int32Class)), Float32Class, 2);
+        var readFunc = new FunctionSymbol("read", GlobalScope);
+        GlobalScope.DefineFunc(readFunc);
+        AddOverload(readFunc, Array.Empty<FunctionParameter>(), Int32Class, 3);
     }
 }
 

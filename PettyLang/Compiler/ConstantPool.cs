@@ -1,6 +1,4 @@
 using PettyLang.Semantic;
-using PettyLang.Types;
-
 namespace PettyLang.Compiler;
 
 public enum ConstantType : byte

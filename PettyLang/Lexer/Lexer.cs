@@ -26,6 +26,7 @@ public class Lexer(string source)
     private bool isEnd => _currentPosition >= _source.Length;
     private bool hasNextSymbol => _currentPosition + 1 < _source.Length;
     private char next => _source[_currentPosition + 1];
+    private char last => _source[_currentPosition - 1];
     private char current => _source[_currentPosition];
     private List<Token> _tokens = new();
 
@@ -81,6 +82,9 @@ public class Lexer(string source)
             if (current == '>' && hasNextSymbol && next == '#') break;
             advance();
         }
+
+        if (isEnd)
+            throw new Error("Multi-line comment termination required (>#)", "Syntax", new(_currentPosition2D, _currentPosition2D));
 
         advance();
         advance();
@@ -188,7 +192,7 @@ public class Lexer(string source)
             advance();
         }
 
-        if (current != '\"' && isEnd) 
+        if (isEnd) 
             throw new Error("String termination required", "Syntax", new Position(startPos, endl ?? _currentPosition2D));
 
         advance();
