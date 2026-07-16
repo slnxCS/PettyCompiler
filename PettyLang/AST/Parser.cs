@@ -180,7 +180,7 @@ public class Parser
         var firstExpr = parseExpression();
         var otherParts = new List<IdentifierExpressionPart>();
 
-        while (match(TokenType.Appeal)) otherParts.Add(parseIdentifierPart());
+        while (match(TokenType.Dot)) otherParts.Add(parseIdentifierPart());
 
         var endPos = last.Position.End;
 
@@ -193,7 +193,7 @@ public class Parser
 
         var otherParts = new List<IdentifierExpressionPart>();
 
-        while (match(TokenType.Appeal))
+        while (match(TokenType.Dot))
         {
             var id = consume(TokenType.Identifier, "Expected identifier");
             otherParts.Add(new(id.Position, id.Lexeme, ParseFuncCalls(), null, null));
@@ -258,7 +258,7 @@ public class Parser
         var ex = parsePrimaryBasicExpression();
         switch (current.Type)
         {
-            case TokenType.Appeal : return parseIdentifier(ex);
+            case TokenType.Dot : return parseIdentifier(ex);
         }
 
         if (ex is IdentifierExpressionPart idPart) ex = new IdentifierExpression(idPart.Position, idPart, Array.Empty<IdentifierExpressionPart>());

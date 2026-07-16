@@ -37,4 +37,17 @@ public class ParserTests
         var parser = new Parser(source);
         Assert.True(Assert.Throws<Error>(() => parser.Parse())?.Message.ToLower().Contains("expected ';'") ?? true);
     }
+
+
+    [TestCase("x", "y()")]
+    public void IdentifierTest(params string[] parts)
+    {
+        var full = string.Join('.', parts) + ";";
+        var parser = new Parser(full);
+        var ast = parser.Parse();
+        Assert.AreEqual(ast.Length, 1);
+        Assert.True(ast[0] is StatementExpression);
+        Assert.True((ast[0] as StatementExpression)!.Expression is IdentifierExpression);
+        Assert.AreEqual(((ast[0] as StatementExpression)!.Expression as IdentifierExpression)!.OtherParts.Length + 1, parts.Length);
+    }
 }

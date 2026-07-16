@@ -19,7 +19,7 @@ public enum TokenType
     Plus, Minus, Slash, Asteric, Equate, Equals, 
     PlusEquate, MinusEquate, DivideEquate, MultiplyEquate,
     LParen, RParen, LSquareBracket, RSquareBracket, LCurlyBrace, RCurlyBrace,
-    Colon, Semicolon, LAngleBrace, RAngleBrace, Dot, Comma, Appeal,
+    Colon, Semicolon, LAngleBrace, RAngleBrace, Dot, Comma,
 }
 
 public class Token(string lexeme, TokenType type, Position position) : object()

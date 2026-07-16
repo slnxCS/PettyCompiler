@@ -46,7 +46,6 @@ public class Compiler
     private readonly ByteWriter compilerWriter = new();
     public readonly ByteWriter GlobalWriter = new();
     public readonly ByteWriter FunctionsWriter = new();
-    public readonly ConstantPool ConstantPool = new();
     public int GlobalsLenght { get; private set; } = 0;
 
     static Dictionary<string, OpCode> intOperators = new()

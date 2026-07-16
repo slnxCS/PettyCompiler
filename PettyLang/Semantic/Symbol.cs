@@ -1,32 +1,49 @@
 using PettyLang.AST;
+using PettyLang.Compiler;
 using PettyLang.Errors;
 
 namespace PettyLang.Semantic;
 
 public abstract class Symbol
 {
-    protected Symbol(string name, Position position, Scope declaredIn, ClassSymbol? type, int? id = null)
-    {        
+    protected Symbol(string name, int? id, ClassSymbol? type, Scope declaredIn, Position position)
+    {
         Name = name;
-        Position = position;
+        if (id is int _id)
+            ID = _id;
+        Type = type ?? (this as ClassSymbol)!;
         DeclaredIn = declaredIn;
-        ID = id ?? this switch
-        {
-            VarSymbol => declaredIn.GetFreeVarID(),
-            FunctionSymbol => -1,
-            ClassSymbol => declaredIn.GetFreeClassID(),
-            _ => throw new NotImplementedException(GetType().Name)
-        };
-        Type = type ?? (this is ClassSymbol c ? c : BuiltIn.ObjectClass);
+        Position = position;
     }
 
     public readonly string Name;
-    public readonly Position Position;
-    public readonly Scope DeclaredIn;
-    public readonly int ID;
+    public int ID;
     public ClassSymbol Type;
+    public virtual Scope? Members => null;
+    public readonly Scope DeclaredIn;
+    public readonly Position Position;
 
-    public bool IsGlobal => DeclaredIn.Type == ScopeType.Global;
+    public virtual byte[] CompileBinaryOperation(ClassInstanceSymbol instance, BinaryExpression expression)
+    {
+        throw new NotSupportedOperandsError(GetFullName(), instance.GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public virtual ClassSymbol VisitBinary(ClassInstanceSymbol instance, BinaryExpression expression)
+    {
+        throw new NotSupportedOperandsError(GetFullName(), instance.GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public virtual ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        throw new NotCallableError(GetFullName(), part.Position);
+    }
+
+    public virtual byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        throw new NotCallableError(GetFullName(), part.Position);
+    }
+    
+    public abstract byte[] GetPushBytes();
 
     public virtual string GetFullName()
     {
@@ -34,21 +51,172 @@ public abstract class Symbol
     }
 }
 
-public class ClassSymbol(string name, Position position, Scope declaredIn) : Symbol(name, position, declaredIn, null)
+public class VarSymbol : Symbol
 {
-    public readonly Scope Members = /*null!*/ new(ScopeType.Class, declaredIn);
-}
+    public ClassInstanceSymbol Value;
 
-public class VarSymbol(string name, Position position, Scope declaredIn, ClassSymbol type) : Symbol(name, position, declaredIn, type)
-{
-    public bool isArg = false;
-}
-
-public class FunctionSymbol : Symbol
-{
-    public FunctionSymbol(string name, Scope declaredIn) : base(name, default, declaredIn, BuiltIn.FunctionClass)
+    public VarSymbol(string name, Position position, Scope declaredIn, ClassSymbol type, ClassInstanceSymbol value) : base(name, declaredIn.GetFreeVarID(), type, declaredIn, position)
     {
+        Value = value;
+    }
+
+    public bool IsGlobal => DeclaredIn.Type == ScopeType.Global;
+
+    public byte[] GetStoreBytes()
+    {
+        return [(byte)(IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL), .. BitConverter.GetBytes(ID)];
+    }
+
+    public override byte[] GetPushBytes()
+    {
+        return [(byte)(IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL), .. BitConverter.GetBytes(ID)];
+    }
+}
+
+public class ClassInstanceSymbol : Symbol
+{
+    public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position, string? name) : base(name ?? @class.GetFullName(), null, @class, declaredIn, position)
+    {
+        selfScope = new(ScopeType.Instance, DeclaredIn);
+    }
+
+    private Scope selfScope;
+    public override Scope Members => selfScope;
+
+    public override byte[] GetPushBytes()
+    {
+        throw new NotImplementedException();
+    }
+}
+
+public class Float32InstanceSymbol : ClassInstanceSymbol
+{
+    public float? Value;
+    public bool IsConstant => Value != null;
+
+    public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position) : base(globalScope, floatClass ?? BuiltIn.Float32Class, position, null)
+    {
+        Value = value;
+    }
+
+    public override byte[] GetPushBytes()
+    {
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new FloatConstant(Value.GetValueOrDefault())))];
+    }
+
+    public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
+    {
+        if (right is not Float32InstanceSymbol)
+            throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
         
+        return expression.Operator switch
+        {
+            "+" => BuiltIn.Float32Class,
+            "-" => BuiltIn.Float32Class,
+            "*" => BuiltIn.Float32Class,
+            "/" => BuiltIn.Float32Class,
+          _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
+        };
+    }
+}
+
+public class Int32InstanceSymbol : ClassInstanceSymbol
+{
+    public int? Value;
+    public bool IsConstant => Value != null;
+
+    public Int32InstanceSymbol(Scope globalScope, ClassSymbol intClass, int? value, Position position) : base(globalScope, intClass, position, null)
+    {
+        Value = value;
+    }
+
+    public override byte[] GetPushBytes()
+    {
+        List<byte> ar = [(byte)OpCode.PUSH_CONSTANT];
+        ar.AddRange(BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value.GetValueOrDefault()))));
+        return ar.ToArray();
+    }
+
+    public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
+    {
+        if (right is not Int32InstanceSymbol)
+            throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
+        
+        return expression.Operator switch
+        {
+            "+" => BuiltIn.Int32Class,
+            "-" => BuiltIn.Int32Class,
+            "*" => BuiltIn.Int32Class,
+            "/" => BuiltIn.Float32Class,
+          _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
+        };
+    }
+}
+
+public class ClassSymbol : Symbol
+{
+    public ClassSymbol(string name, Scope declaredIn, Position position) : base(name, declaredIn.GetFreeClassID(), null, declaredIn, position)
+    {
+        ClassScope = new(ScopeType.Class, declaredIn);
+    }
+
+    protected Scope ClassScope;
+    public override Scope Members => ClassScope;
+
+    public override byte[] GetPushBytes()
+    {
+        return [];
+    }
+
+    public virtual ClassInstanceSymbol GetInstance(Scope scope, Position position)
+    {
+        return new(scope, this, position, null);
+    }
+}
+
+public class Int32ClassSymbol : ClassSymbol
+{
+    public Int32ClassSymbol() : base("int32", BuiltIn.GlobalScope, default) { }
+
+    public override Int32InstanceSymbol GetInstance(Scope scope, Position position)
+    {
+        return new Int32InstanceSymbol(scope, this, null, position);
+    }
+}
+
+public class Float32ClassSymbol : ClassSymbol
+{
+    public Float32ClassSymbol() : base("float32", BuiltIn.GlobalScope, default) { }
+
+    public override Float32InstanceSymbol GetInstance(Scope scope, Position position)
+    {
+        return new Float32InstanceSymbol(scope, this, null, position);
+    }
+}
+
+public class FunctionSymbol : ClassInstanceSymbol
+{
+    public override ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        var ov = GetOverload(arguments, true, part.Position);
+        return ov.ReturnType;
+    }
+
+    public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        if (part.ResolvedOverload == null)
+            throw new ArgumentNullException(nameof(part.ResolvedOverload));
+        
+        var ov = part.ResolvedOverload;
+
+        byte[] ar = [(byte)((ov is BuiltInFunctionOverload) ? OpCode.SYS_CALL : OpCode.CALL)];
+        ar = [..ar, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
+        return ar;
+    }
+
+    public FunctionSymbol(string name, Scope declaredIn) : base(declaredIn, BuiltIn.FunctionClass, default, name)
+    {
+
     }
 
     private readonly List<FunctionOverload> Overloads = new();

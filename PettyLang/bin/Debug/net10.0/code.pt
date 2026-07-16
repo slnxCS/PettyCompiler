@@ -1,24 +1,14 @@
-# Третья функция: проверяем локальные переменные
-func Third(a : int32) : int32 {
-    var temp = 100;
-    return a + temp;
+var minusZero : int32 = -1;
+
+func test(a : int32, b : int32, c : int32) : int32 {
+    var d = 10 * minusZero - -10;
+    print(d);
+    var e = a - b - c - d;
+    print(e);
+    return e + 100;
 }
 
-# Вторая функция: проверяем передачу двух аргументов
-func Second(a : int32, b : int32) : int32 {
-    var temp = 5;
-    var res = Third(a + b);
-    return res + temp;
-}
-
-# Первая функция: проверяем изоляцию кадра
-func First(x : int32) : int32 {
-    var temp = 10;
-    return Second(temp, x); 
-}
-
-# Главная функция возвращает void
-func Main() : void {
-    var finalResult = First(5);
-    print(finalResult); # На выходе в консоли должно быть ровно 120
+func Main() : {
+    var y = 10.0 - 10.0;
+    print(test(10,20,30));
 }

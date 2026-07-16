@@ -27,7 +27,7 @@ public class CompileFabric(Statement[] ast)
         var list = new List<byte>();
         var compiler = new Compiler(ast, analyzer);
         var byteCode = compiler.Comiple();
-        list.AddRange(new HeaderCompiler(compiler.ConstantPool).Compile());
+        list.AddRange(new HeaderCompiler().Compile());
         list.AddRange(BitConverter.GetBytes(analyzer.GlobalVariables.Count));
         list.AddRange(compiler.GlobalWriter.GetWritedBytesArray());
         list.Add((byte)OpCode.HALT);

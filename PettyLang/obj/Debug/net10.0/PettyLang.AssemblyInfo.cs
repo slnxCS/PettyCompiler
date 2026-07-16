@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PettyLang")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7a63145d915e4f69f4029411b5ea54c9c5b37af6")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+be60ddcc300013234dcd9b04447d73ea74a2bcf8")]
 [assembly: System.Reflection.AssemblyProductAttribute("PettyLang")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PettyLang")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

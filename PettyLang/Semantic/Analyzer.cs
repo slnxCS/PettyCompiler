@@ -6,7 +6,9 @@ namespace PettyLang.Semantic;
 public static class BuiltIn {
     private static bool inited = false;
 
-    public static ClassSymbol Int32Class = null!, Float32Class = null!, VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
+    public static ClassSymbol VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
+    public static Int32ClassSymbol Int32Class = null!;
+    public static Float32ClassSymbol Float32Class = null!;
     public static ClassSymbol? StringClass = null;
     public static readonly Scope GlobalScope = new(ScopeType.Global, null);
 
@@ -15,15 +17,13 @@ public static class BuiltIn {
         if (inited) return;
         else inited = true;
 
-        ObjectClass = new("Object", default, GlobalScope);
+        ObjectClass = new("Object", GlobalScope, default);
+        VoidClass = new("void", GlobalScope, default);
 
-        Int32Class = new("int32", default, GlobalScope);
-        Float32Class = new("float32", default, GlobalScope);
-        VoidClass = new("void", default, GlobalScope);
-        FunctionClass = new("function", default, GlobalScope);
+        Int32Class = new();
+        Float32Class = new();
+        FunctionClass = new("function", GlobalScope, default);
 
-
-        StringClass = GlobalScope.GetClass("String", true);
         Define();
     }
 
@@ -219,7 +219,8 @@ public class Analyzer
 
         for (int i = 0; i < ov.Arity; i++)
         {
-            currentScope.DefineVar(new(ov.Parameters[i].Name, ov.Parameters[i].Position, currentScope, ov.Parameters[i].Type) {isArg = true});
+            currentScope.DefineVar(new(ov.Parameters[i].Name, ov.Parameters[i].Position, currentScope, ov.Parameters[i].Type, 
+                GetInstanceSymbol(ov.Parameters[i].Type, ov.Parameters[i].Position)));
         }
 
         try
@@ -253,7 +254,8 @@ public class Analyzer
         }
         if (type == BuiltIn.VoidClass) 
             throw new Error($"cannot assign a value of type void to a variable", $"Semantic", varDecl.Value.Position);
-        varDecl.Resolved = new(varDecl.Name, varDecl.Position, currentScope, type);
+        var value = GetInstanceSymbol(resolved);
+        varDecl.Resolved = new(varDecl.Name, varDecl.Position, currentScope, type, value);
         currentScope.DefineVar(varDecl.Resolved);
         if (varDecl.Resolved.IsGlobal)
             GlobalVariables.Add(varDecl);
@@ -269,8 +271,8 @@ public class Analyzer
     {
         switch (expr)
         {
-            case IntExpression : return BuiltIn.Int32Class;
-            case FloatExpression : return BuiltIn.Float32Class;
+            case IntExpression i : return new Int32InstanceSymbol(currentScope, BuiltIn.Int32Class, i.Number, i.Position);
+            case FloatExpression f : return new Float32InstanceSymbol(currentScope, BuiltIn.Float32Class, f.Number, f.Position);
             case StringExpression : return BuiltIn.StringClass ?? 
                 throw new Error("To use the String type, import the String class from the std module (import String from std)", "Semantic", expr.Position);
             case IdentifierExpression id : return ResolveIdentifierExpression(id);
@@ -280,23 +282,40 @@ public class Analyzer
         }
     }
 
-    Symbol ResolveBin(BinaryExpression bin)
+    ClassInstanceSymbol GetInstanceSymbol(Symbol sym)
+    {
+        if (sym is ClassInstanceSymbol instance)
+            return instance;
+        if (sym is VarSymbol var)
+            return var.Value;
+        
+        throw new Error($"Value required", "Semantic", sym.Position);
+    }
+
+    ClassInstanceSymbol GetInstanceSymbol(ClassSymbol sym, Position position)
+    {
+        return sym.GetInstance(currentScope, position);
+    }
+
+    ClassInstanceSymbol ResolveBin(BinaryExpression bin)
     {
         var left = ResolveExpression(bin.Left);
         var right = ResolveExpression(bin.Right);
 
-        if (left.Type != right.Type)
-            throw new NotImplementedException();
+        var leftInst = GetInstanceSymbol(left);
+        var rightInst = GetInstanceSymbol(right);
+
         bin.LeftSymbol = left;
         bin.RightSymbol = right;
-        if (left.Type == BuiltIn.Int32Class && right.Type == BuiltIn.Int32Class && bin.Operator == "/")
-            return BuiltIn.Float32Class;
-        return left;
+        
+        return GetInstanceSymbol(leftInst.VisitBinary(rightInst, bin), bin.Position);
     }
 
     ClassSymbol GetSymType(Symbol s)
     {
-        return s is ClassSymbol cl ? cl : (s as VarSymbol)!.Type;
+        if (s is ClassSymbol c)
+            return c;
+        return s.Type;
     }
 
     ClassSymbol GetSymType(IdentifierExpression id)

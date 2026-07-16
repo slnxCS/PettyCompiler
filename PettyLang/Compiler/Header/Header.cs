@@ -2,9 +2,8 @@ using System.Text;
 
 namespace PettyLang.Compiler;
 
-public class HeaderCompiler(ConstantPool constantPool)
+public class HeaderCompiler
 {
-    private readonly ConstantPool ConstantPool = constantPool;
     public const float BYTE_CODE_VERSION = 1.2f;
 
     public static readonly byte[] MAGIC = Encoding.ASCII.GetBytes("[PTVM]");

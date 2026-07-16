@@ -59,7 +59,7 @@ public class Lexer(string source)
         {"<", TokenType.LAngleBrace},
         {">", TokenType.RAngleBrace},
         {":", TokenType.Colon},
-        {"::", TokenType.Appeal},
+        //{"::", TokenType.Appeal},
         {";", TokenType.Semicolon},
         {".", TokenType.Dot},
         {",", TokenType.Comma},
@@ -133,6 +133,13 @@ public class Lexer(string source)
         var num = "";
         var isFloat = false;
         var startPos = _currentPosition2DIncrement;
+        var isNegative = current == '-';
+
+        if (isNegative)
+        {
+            num += '-';
+            advance();
+        }
 
         while (!isEnd && char.IsDigit(current))
         {
@@ -157,6 +164,13 @@ public class Lexer(string source)
         var num = "";
         var isFloat = false;
         var startPos = _currentPosition2DIncrement;
+        var isNegative = current == '-';
+
+        if (isNegative)
+        {
+            num += '-';
+            advance();
+        }
 
         while (!isEnd && char.IsDigit(current))
         {
@@ -344,7 +358,7 @@ public class Lexer(string source)
         if (char.IsLetter(current) || current == '_') return _processID();
         else if (current == '\"') return _processString();
         else if (current == '\'') return _processChar();
-        else if (char.IsDigit(current)) return _processNumber();
+        else if (char.IsDigit(current) || current == '-' && hasNextSymbol && char.IsDigit(next)) return _processNumber();
         else return _processSymbol();
     }
 
@@ -390,7 +404,7 @@ public class Lexer(string source)
             if (char.IsLetter(current) || current == '_') _addID();
             else if (current == '\"') _addString();
             else if (current == '\'') _addChar();
-            else if (char.IsDigit(current)) _addNumber();
+            else if (char.IsDigit(current) || current == '-' && hasNextSymbol && char.IsDigit(next)) _addNumber();
             else _addSymbol();
         }
 
