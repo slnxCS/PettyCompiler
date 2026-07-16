@@ -6,11 +6,13 @@ public abstract class Expression(Position position) : ASTNode(position);
 
 public class IntExpression(int number, Position position) : Expression(position)
 {
+    public Int32InstanceSymbol Resolved = null!;
     public readonly int Number = number;
 }
 
 public class FloatExpression(float number, Position position) : Expression(position)
 {
+    public Float32InstanceSymbol Resolved = null!;
     public readonly float Number = number;
 }
 
@@ -30,6 +32,8 @@ public class IdentifierExpressionPart(Position position, string id, Expression[]
 
     public Symbol Resolved = null!;
     public FunctionOverload? ResolvedOverload = null;
+    public FunctionParameter[]? ResolvedParameters = null;
+    public IdentifierExpression Parent = null!;
 }
 
 public class IdentifierExpression : Expression
@@ -47,6 +51,10 @@ public class IdentifierExpression : Expression
         FirstPart = firstPart;
         OtherParts = otherParts;
         IsFirstIdentifier = firstPart is IdentifierExpressionPart;
+        if (FirstPart is IdentifierExpressionPart _firstPart)
+            _firstPart.Parent = this;
+        foreach (var part in OtherParts) 
+            part.Parent = this;
     }
 }
 

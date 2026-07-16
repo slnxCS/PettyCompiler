@@ -23,9 +23,9 @@ public abstract class Symbol
     public readonly Scope DeclaredIn;
     public readonly Position Position;
 
-    public virtual byte[] CompileBinaryOperation(ClassInstanceSymbol instance, BinaryExpression expression)
+    public virtual void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler, IByteWriter writer)
     {
-        throw new NotSupportedOperandsError(GetFullName(), instance.GetFullName(), expression.Operator, expression.Position);
+        throw new NotSupportedOperandsError(GetFullName(), expression.RightSymbol.GetFullName(), expression.Operator, expression.Position);
     }
 
     public virtual ClassSymbol VisitBinary(ClassInstanceSymbol instance, BinaryExpression expression)
@@ -71,6 +71,18 @@ public class VarSymbol : Symbol
     {
         return [(byte)(IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL), .. BitConverter.GetBytes(ID)];
     }
+
+    public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        Value.CompileBinaryOperation(expression, compiler, writer);
+    }
+
+    public override Scope? Members => Value.Members;
+
+    public override ClassSymbol VisitBinary(ClassInstanceSymbol instance, BinaryExpression expression)
+    {
+        return Value.VisitBinary(instance, expression);
+    }
 }
 
 public class ClassInstanceSymbol : Symbol
@@ -99,9 +111,30 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         Value = value;
     }
 
+    static Dictionary<string, OpCode> operators = new()
+    {
+        {"+", OpCode.ADD_FLOAT},
+        {"-", OpCode.SUB_FLOAT},
+        {"*", OpCode.MUL_FLOAT},
+        {"/", OpCode.DIV_FLOAT},
+    };
+
+    public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        var lintExpr = expression.Left as FloatExpression;
+        var rintExpr = expression.Right as FloatExpression;
+
+        if (lintExpr == null || rintExpr == null)
+            throw new NotSupportedOperandsError(GetFullName(), expression.RightSymbol.GetFullName(), expression.Operator, expression.Position);
+        
+        compiler.CompileExpression(lintExpr, writer);
+        compiler.CompileExpression(rintExpr, writer);
+        writer.Emit(operators[expression.Operator]);
+    }
+
     public override byte[] GetPushBytes()
     {
-        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new FloatConstant(Value.GetValueOrDefault())))];
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new FloatConstant(Value ?? throw new NullReferenceException("Value"))))];
     }
 
     public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
@@ -115,7 +148,7 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
             "-" => BuiltIn.Float32Class,
             "*" => BuiltIn.Float32Class,
             "/" => BuiltIn.Float32Class,
-          _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
+            _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
         };
     }
 }
@@ -132,9 +165,25 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
 
     public override byte[] GetPushBytes()
     {
-        List<byte> ar = [(byte)OpCode.PUSH_CONSTANT];
-        ar.AddRange(BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value.GetValueOrDefault()))));
-        return ar.ToArray();
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value ?? throw new NullReferenceException("Value"))))];
+    }
+
+    static Dictionary<string, OpCode> operators = new()
+    {
+        {"+", OpCode.ADD_INT},
+        {"-", OpCode.SUB_INT},
+        {"*", OpCode.MUL_INT},
+        {"/", OpCode.DIV_INT},
+    };
+
+    public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        var lintExpr = expression.Left;
+        var rintExpr = expression.Right;
+        
+        compiler.CompileExpression(lintExpr, writer);
+        compiler.CompileExpression(rintExpr, writer);
+        writer.Emit(operators[expression.Operator]);
     }
 
     public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
@@ -209,8 +258,7 @@ public class FunctionSymbol : ClassInstanceSymbol
         
         var ov = part.ResolvedOverload;
 
-        byte[] ar = [(byte)((ov is BuiltInFunctionOverload) ? OpCode.SYS_CALL : OpCode.CALL)];
-        ar = [..ar, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
+        byte[] ar = [(byte)((ov is BuiltInFunctionOverload) ? OpCode.SYS_CALL : OpCode.CALL), .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];        
         return ar;
     }
 

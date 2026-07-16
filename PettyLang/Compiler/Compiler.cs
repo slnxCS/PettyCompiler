@@ -87,48 +87,48 @@ public class Compiler
         writer.Emit(statement.Resolved.ID);
     }
 
-    void CompileExpression(Expression ex, IByteWriter? writer = null)
+    public void CompileExpression(Expression ex, IByteWriter? writer = null)
     {
         if (writer == null)
             writer = compilerWriter;
         switch (ex)
         {
             case IntExpression _int : 
-                writer.Emit(OpCode.PUSH_CONSTANT);
-                writer.Emit(ConstantPool.Add(new IntConstant(_int.Number)));
-            break;
-            case FloatExpression _float : 
-                writer.Emit(OpCode.PUSH_CONSTANT);
-                writer.Emit(ConstantPool.Add(new FloatConstant(_float.Number)));
-            break;
-            case IdentifierExpression id : 
-                CompileIdentifierExpression(id,  writer);
+                writer.WriteBytes(_int.Resolved.GetPushBytes());
             break;
 
-            case BinaryExpression bin :
-                CompileBinary(bin, writer);
+            case FloatExpression _float : 
+                writer.WriteBytes(_float.Resolved.GetPushBytes());
+            break;
+
+            case IdentifierExpression id : 
+                CompileIdentifierExpression(id,  writer);
             break;
 
             case IdentifierExpressionPart idPart :
                 CompileIdentifierExpressionPart(idPart, writer);
             break;
 
+            case BinaryExpression bin :
+                bin.LeftSymbol.CompileBinaryOperation(bin, this, writer);
+            break;
+
             default : throw new NotImplementedException(ex.ToString());
         }
     }
 
-    void CompileBinary(BinaryExpression bin, IByteWriter writer)
-    {
-        CompileExpression(bin.Left, writer);
-        CompileExpression(bin.Right, writer);
-
-        if (bin.LeftSymbol.Type == BuiltIn.Int32Class && bin.RightSymbol.Type == BuiltIn.Int32Class)
-            writer.Emit(intOperators[bin.Operator]);
-        else if (bin.LeftSymbol.Type == BuiltIn.Float32Class && bin.RightSymbol.Type == BuiltIn.Float32Class)
-            writer.Emit(floatOperators[bin.Operator]);
-
-        else throw new NotImplementedException();
-    }
+    //void CompileBinary(BinaryExpression bin, IByteWriter writer)
+    //{
+    //    CompileExpression(bin.Left, writer);
+    //    CompileExpression(bin.Right, writer);
+//
+    //    if (bin.LeftSymbol.Type == BuiltIn.Int32Class && bin.RightSymbol.Type == BuiltIn.Int32Class)
+    //        writer.Emit(intOperators[bin.Operator]);
+    //    else if (bin.LeftSymbol.Type == BuiltIn.Float32Class && bin.RightSymbol.Type == BuiltIn.Float32Class)
+    //        writer.Emit(floatOperators[bin.Operator]);
+//
+    //    else throw new NotImplementedException();
+    //}
 
     void CompileIdentifierExpressionPart(IdentifierExpressionPart part, IByteWriter writer)
     {
@@ -140,25 +140,21 @@ public class Compiler
                 CompileExpression(part.FuncCallsArguments[0][i], writer);
             }
             
-            writer.Emit(ov is BuiltInFunctionOverload ? OpCode.SYS_CALL : OpCode.CALL);
-            writer.Emit(ov.ID);
-            if (ov is not BuiltInFunctionOverload) writer.Emit(ov.Arity);
+            writer.WriteBytes(ov.Parent.GetBytesForCall(part.ResolvedParameters!, part.Parent, part));
             return;
         }
 
         var sym = part.Resolved;
 
-        if (sym is VarSymbol var)
-        {
-            writer.Emit(var.IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL);
-            writer.Emit(var.ID);
-        }
-        else throw new NotImplementedException(part.Resolved.ToString());
+        writer.WriteBytes(sym.GetPushBytes());
     }
 
     void CompileIdentifierExpression(IdentifierExpression id, IByteWriter writer)
     {
         CompileExpression(id.FirstPart, writer);
+
+        foreach (var part in id.OtherParts)
+            CompileIdentifierExpressionPart(part, writer);   
     }
 
     void CompileReturn(ReturnStatement statement, IByteWriter writer)
@@ -191,7 +187,7 @@ public class Compiler
                 CompileAssign(varAssigment, writer);
             break;
 
-            case FuncDefineStatement funcDef : break;
+            case FuncDefineStatement : break;
         }
     }    
 

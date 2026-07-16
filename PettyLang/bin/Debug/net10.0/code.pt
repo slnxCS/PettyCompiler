@@ -10,5 +10,6 @@ func test(a : int32, b : int32, c : int32) : int32 {
 
 func Main() : {
     var y = 10.0 - 10.0;
+    var x = 10;
     print(test(10,20,30));
 }

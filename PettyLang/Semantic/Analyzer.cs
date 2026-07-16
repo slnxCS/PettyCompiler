@@ -271,8 +271,16 @@ public class Analyzer
     {
         switch (expr)
         {
-            case IntExpression i : return new Int32InstanceSymbol(currentScope, BuiltIn.Int32Class, i.Number, i.Position);
-            case FloatExpression f : return new Float32InstanceSymbol(currentScope, BuiltIn.Float32Class, f.Number, f.Position);
+            case IntExpression i : 
+            {
+                i.Resolved = new Int32InstanceSymbol(currentScope, BuiltIn.Int32Class, i.Number, i.Position);
+                return i.Resolved;
+            }
+            case FloatExpression f : 
+            {
+                f.Resolved = new Float32InstanceSymbol(currentScope, BuiltIn.Float32Class, f.Number, f.Position);
+                return f.Resolved;
+            }
             case StringExpression : return BuiltIn.StringClass ?? 
                 throw new Error("To use the String type, import the String class from the std module (import String from std)", "Semantic", expr.Position);
             case IdentifierExpression id : return ResolveIdentifierExpression(id);
@@ -341,7 +349,7 @@ public class Analyzer
     Symbol ResolveIdentifierPart(IdentifierExpressionPart part, Scope lookingScope, bool local, Symbol? lastSym)
     {
         var errorMsg = lastSym == null ? $"Name '{part.ID}' does not exist in current context"
-            : $"Class '{lastSym.GetFullName()}' does not contains field with name '{part.ID}'";
+            : $"Class '{lastSym.Type.GetFullName()}' does not contains field with name '{part.ID}'";
         if (part.FuncCallsArguments.Length == 0)
         {
             var _v = lookingScope.GetVar(part.ID, local);
@@ -366,6 +374,7 @@ public class Analyzer
                 var resolved = ResolveArgs(args);
                 var ov = sym.GetOverload(resolved, true, part.Position);
                 part.ResolvedOverload = ov;
+                part.ResolvedParameters = resolved;
             //}
             return ov.ReturnType;
         }
@@ -378,9 +387,7 @@ public class Analyzer
 
         for (int i = 0; i < identifier.OtherParts.Length; i++)
         {
-            if (sym is not ClassSymbol cl) 
-                throw new Exception($"Cannot use operator '::' to '{sym.GetFullName()}'");
-            lookingScope = cl.Members;
+            lookingScope = sym.Members ?? throw new Exception($"Cannot use operator '.' to '{sym.GetFullName()}'");;
             var part = identifier.OtherParts[i];
             sym = ResolveIdentifierPart(part, lookingScope, true, sym);
         }

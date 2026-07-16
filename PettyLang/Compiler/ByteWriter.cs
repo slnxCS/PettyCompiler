@@ -2,7 +2,8 @@ namespace PettyLang.Compiler;
 
 public interface IByteWriter
 {
-    public void WriteByte(byte b);
+    public void WriteByte(byte _byte);
+    public void WriteBytes(byte[] bytes);
     public void Emit(OpCode opCode);
     public void Emit(int number);
     public void Emit(float number);
@@ -20,6 +21,11 @@ public class ByteWriter : IByteWriter
     public void WriteByte(byte b)
     {
         writed.Add(b);
+    }
+
+    public void WriteBytes(byte[] b)
+    {
+        writed.AddRange(b);
     }
 
     public void Emit(int number)
