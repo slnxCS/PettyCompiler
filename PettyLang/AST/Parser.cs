@@ -241,27 +241,38 @@ public class Parser
 
     private Expression parseMultiplicative()
     {
-        var ex = parsePrimaryExpression();
+        var ex = parseAsExpression();
         
         while (match(TokenType.Slash) || match(TokenType.Asteric))
         {
             var op = last.Lexeme;
-            var right = parsePrimaryExpression();
+            var right = parseAsExpression();
             ex = new BinaryExpression(new(ex.Position.Start, right.Position.End), ex, op, right);
         }
 
         return ex;
     }
 
-    private Expression parsePrimaryExpression()
+    private Expression parseAsExpression()
     {
-        var ex = parsePrimaryBasicExpression();
-        switch (current.Type)
+        var ex = parseAfterIdentifierExpression();
+
+        while (match(TokenType.As))
         {
-            case TokenType.Dot : return parseIdentifier(ex);
+            var asType = parseIdentifier();
+            ex = new AsExpression(ex, asType, new(ex.Position.Start, asType.Position.End));
         }
 
-        if (ex is IdentifierExpressionPart idPart) ex = new IdentifierExpression(idPart.Position, idPart, Array.Empty<IdentifierExpressionPart>());
+        return ex;
+    }
+
+    private Expression parseAfterIdentifierExpression()
+    {
+        var ex = parsePrimaryBasicExpression();
+        if (current.Type == TokenType.Dot)
+            return parseIdentifier(ex);
+
+        if (ex is IdentifierExpressionPart idPart) ex = new IdentifierExpression(idPart.Position, idPart, []);
 
         return ex;
     }

@@ -64,3 +64,12 @@ public class BinaryExpression(Position position, Expression left, string @operat
     public Symbol LeftSymbol = null!, RightSymbol = null!;
     public readonly string Operator = @operator;
 }
+
+public class AsExpression(Expression value, IdentifierExpression asType, Position position) : Expression(position)
+{
+    public readonly Expression Value = value;
+    public readonly IdentifierExpression AsType = asType;
+
+    public Symbol ResolvedValue = null!;
+    public ClassSymbol ResolvedAsType = null!;
+}

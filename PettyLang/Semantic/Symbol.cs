@@ -38,6 +38,20 @@ public abstract class Symbol
         throw new NotCallableError(GetFullName(), part.Position);
     }
 
+    public virtual ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
+    {
+        if (castType == Type)
+            return Type;
+        throw new NotSupportedCastTypeError(GetFullName(), castType.GetFullName(), expression.Position);
+    }
+
+    public virtual void CompileCastBytes(ClassSymbol castType, AsExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        if (castType == Type)
+            return;
+        throw new NotSupportedCastTypeError(GetFullName(), castType.GetFullName(), expression.Position);
+    }
+
     public virtual byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
     {
         throw new NotCallableError(GetFullName(), part.Position);
@@ -83,6 +97,16 @@ public class VarSymbol : Symbol
     {
         return Value.VisitBinary(instance, expression);
     }
+
+    public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
+    {
+        return Value.ResolveCast(castType, expression);
+    }
+
+    public override void CompileCastBytes(ClassSymbol castType, AsExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        Value.CompileCastBytes(castType, expression, compiler, writer);
+    }
 }
 
 public class ClassInstanceSymbol : Symbol
@@ -109,6 +133,25 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
     public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position) : base(globalScope, floatClass ?? BuiltIn.Float32Class, position, null)
     {
         Value = value;
+    }
+
+    public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
+    {
+        if (castType is Int32ClassSymbol)
+            return BuiltIn.Int32Class;
+        
+        return base.ResolveCast(castType, expression);
+    }
+
+    public override void CompileCastBytes(ClassSymbol castType, AsExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        if (castType is Int32ClassSymbol)
+        {
+            compiler.CompileExpression(expression.Value, writer);
+            writer.Emit(OpCode.CAST_FROM_FLOAT32_TO_INT32);
+            return;
+        }
+        base.CompileCastBytes(castType, expression, compiler, writer);
     }
 
     static Dictionary<string, OpCode> operators = new()

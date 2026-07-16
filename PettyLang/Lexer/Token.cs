@@ -12,7 +12,7 @@ public enum TokenType
     FloatNumber,
     
     // Keywords :
-    Func, Var, Import, Package, Return,
+    Func, Var, Import, Package, Return, As,
 
     // Symbols :
 

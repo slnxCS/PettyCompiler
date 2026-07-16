@@ -29,6 +29,8 @@ public enum OpCode : byte
     DIV_FLOAT = 20,
 
     HALT = 15,
+    CAST_FROM_FLOAT32_TO_INT32 = 14,
+    CAST_FROM_INT32_TO_FLOAT32 = 16,
 
 }
 
@@ -47,22 +49,6 @@ public class Compiler
     public readonly ByteWriter GlobalWriter = new();
     public readonly ByteWriter FunctionsWriter = new();
     public int GlobalsLenght { get; private set; } = 0;
-
-    static Dictionary<string, OpCode> intOperators = new()
-    {
-        {"+", OpCode.ADD_INT},
-        {"-", OpCode.SUB_INT},
-        {"/", OpCode.DIV_INT},
-        {"*", OpCode.MUL_INT},
-    };
-
-    static Dictionary<string, OpCode> floatOperators = new()
-    {
-        {"+", OpCode.ADD_FLOAT},
-        {"-", OpCode.SUB_FLOAT},
-        {"/", OpCode.DIV_FLOAT},
-        {"*", OpCode.MUL_FLOAT},
-    };
 
     void CompileVarDef(VarDeclStatement var, IByteWriter writer)
     {
@@ -111,6 +97,10 @@ public class Compiler
 
             case BinaryExpression bin :
                 bin.LeftSymbol.CompileBinaryOperation(bin, this, writer);
+            break;
+
+            case AsExpression @as :
+                @as.ResolvedValue.CompileCastBytes(@as.ResolvedAsType, @as, this, writer);
             break;
 
             default : throw new NotImplementedException(ex.ToString());

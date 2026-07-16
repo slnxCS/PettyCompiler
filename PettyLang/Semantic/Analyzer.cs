@@ -286,6 +286,7 @@ public class Analyzer
             case IdentifierExpression id : return ResolveIdentifierExpression(id);
             case IdentifierExpressionPart idPart : return ResolveIdentifierPart(idPart, currentScope, false, null);
             case BinaryExpression bin : return ResolveBin(bin);
+            case AsExpression @as : return ResolveCastExpr(@as);
             default : throw new NotImplementedException($"{expr}");
         }
     }
@@ -298,6 +299,23 @@ public class Analyzer
             return var.Value;
         
         throw new Error($"Value required", "Semantic", sym.Position);
+    }
+
+    ClassSymbol ExpectClass(Expression expr)
+    {
+        var s = ResolveExpression(expr);
+        if (s is not ClassSymbol cl)
+            throw new Error("Expected class", "Semantic", expr.Position);
+        return cl;
+    }
+
+    ClassInstanceSymbol ResolveCastExpr(AsExpression expression)
+    {
+        var sym = ResolveExpression(expression.Value);
+        var type = ExpectClass(expression.AsType);
+        expression.ResolvedValue = sym;
+        expression.ResolvedAsType = type;
+        return GetInstanceSymbol(sym.ResolveCast(type, expression), expression.Position);
     }
 
     ClassInstanceSymbol GetInstanceSymbol(ClassSymbol sym, Position position)
