@@ -32,6 +32,9 @@ public enum OpCode : byte
     CAST_FROM_FLOAT32_TO_INT32 = 14,
     CAST_FROM_INT32_TO_FLOAT32 = 16,
 
+    JMP_IF_FALSE = 26,
+    JMP_IF_TRUE = 27,
+    JMP = 28,
 }
 
 public class Compiler
@@ -196,8 +199,25 @@ public class Compiler
             break;
 
             case FuncDefineStatement : break;
+
+            case IfStatement @if :
+                CompileIf(@if);
+            break;    
+
+            default : 
+                throw new NotImplementedException(st.ToString());
         }
     }    
+
+    void CompileIf(IfStatement statement)
+    {
+        CompileExpression(statement.Condition);
+        Emit(OpCode.JMP_IF_FALSE);
+        var oldLen = compiled.Count;
+        CompileStatements(statement.Block.Statements);
+        var newLen = compiled.Count + 4;
+        compiled.InsertRange(oldLen, BitConverter.GetBytes(newLen));
+    }
 
     void CompileStatements(Statement[] sts)
     {
