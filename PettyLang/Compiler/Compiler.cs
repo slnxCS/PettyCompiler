@@ -45,22 +45,36 @@ public class Compiler
     private readonly Analyzer analyzer;
 
     private readonly Statement[] ASTNodes;
-    private readonly ByteWriter compilerWriter = new();
-    public readonly ByteWriter GlobalWriter = new();
-    public readonly ByteWriter FunctionsWriter = new();
+    public List<byte> compiled = new();
+
+    public void Emit(int value)
+    {
+        compiled.AddRange(BitConverter.GetBytes(value));
+    }
+
+    public void Emit(float value)
+    {
+        compiled.AddRange(BitConverter.GetBytes(value));
+    }
+
+    public void Emit(OpCode opCode)
+    {
+        compiled.Add((byte)opCode);
+    }
+
     public int GlobalsLenght { get; private set; } = 0;
 
-    void CompileVarDef(VarDeclStatement var, IByteWriter writer)
+    void CompileVarDef(VarDeclStatement var)
     {
         if (!var.Resolved.IsGlobal)
         {
-            CompileExpression(var.Value, writer);
-            writer.Emit(OpCode.STORE_LOCAL);
-            writer.Emit(var.Resolved.ID);
+            CompileExpression(var.Value);
+            Emit(OpCode.STORE_LOCAL);
+            Emit(var.Resolved.ID);
         }
     }
 
-    void CompileAssign(VarAssigmentStatement statement, IByteWriter writer)
+    void CompileAssign(VarAssigmentStatement statement)
     {
         if (statement.Operator != "=")
             throw new NotImplementedException();
@@ -68,43 +82,41 @@ public class Compiler
         if (statement.Resolved == null)
             throw new Error("The value is null. Stop the compiler", "Compiler", statement.Position);
 
-        CompileExpression(statement.Value, writer);
-        writer.Emit(statement.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
-        writer.Emit(statement.Resolved.ID);
+        CompileExpression(statement.Value);
+        Emit(statement.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
+        Emit(statement.Resolved.ID);
     }
 
-    public void CompileExpression(Expression ex, IByteWriter? writer = null)
+    public void CompileExpression(Expression ex)
     {
-        if (writer == null)
-            writer = compilerWriter;
         switch (ex)
         {
             case IntExpression _int : 
-                writer.WriteBytes(_int.Resolved.GetPushBytes());
+                compiled.AddRange(_int.Resolved.GetPushBytes());
             break;
 
             case FloatExpression _float : 
-                writer.WriteBytes(_float.Resolved.GetPushBytes());
+                compiled.AddRange(_float.Resolved.GetPushBytes());
             break;
 
             case BoolExpression _bool : 
-                writer.WriteBytes(_bool.Resolved.GetPushBytes());
+                compiled.AddRange(_bool.Resolved.GetPushBytes());
             break;
 
             case IdentifierExpression id : 
-                CompileIdentifierExpression(id,  writer);
+                CompileIdentifierExpression(id);
             break;
 
             case IdentifierExpressionPart idPart :
-                CompileIdentifierExpressionPart(idPart, writer);
+                CompileIdentifierExpressionPart(idPart);
             break;
 
             case BinaryExpression bin :
-                bin.LeftSymbol.CompileBinaryOperation(bin, this, writer);
+                bin.LeftSymbol.CompileBinaryOperation(bin, this);
             break;
 
             case AsExpression @as :
-                @as.ResolvedValue.CompileCastBytes(@as.ResolvedAsType, @as, this, writer);
+                @as.ResolvedValue.CompileCastBytes(@as.ResolvedAsType, @as, this);
             break;
 
             default : throw new NotImplementedException(ex.ToString());
@@ -124,107 +136,115 @@ public class Compiler
     //    else throw new NotImplementedException();
     //}
 
-    void CompileIdentifierExpressionPart(IdentifierExpressionPart part, IByteWriter writer)
+    void CompileIdentifierExpressionPart(IdentifierExpressionPart part)
     {
         if (part.ResolvedOverload != null)
         {
             var ov = part.ResolvedOverload;
             for (int i = 0; i < part.FuncCallsArguments[0].Length; i++)
             {
-                CompileExpression(part.FuncCallsArguments[0][i], writer);
+                CompileExpression(part.FuncCallsArguments[0][i]);
             }
             
-            writer.WriteBytes(ov.Parent.GetBytesForCall(part.ResolvedParameters!, part.Parent, part));
+            compiled.AddRange(ov.Parent.GetBytesForCall(part.ResolvedParameters!, part.Parent, part));
             return;
         }
 
         var sym = part.Resolved;
 
-        writer.WriteBytes(sym.GetPushBytes());
+        compiled.AddRange(sym.GetPushBytes());
     }
 
-    void CompileIdentifierExpression(IdentifierExpression id, IByteWriter writer)
+    void CompileIdentifierExpression(IdentifierExpression id)
     {
-        CompileExpression(id.FirstPart, writer);
+        CompileExpression(id.FirstPart);
 
         foreach (var part in id.OtherParts)
-            CompileIdentifierExpressionPart(part, writer);   
+            CompileIdentifierExpressionPart(part);   
     }
 
-    void CompileReturn(ReturnStatement statement, IByteWriter writer)
+    void CompileReturn(ReturnStatement statement)
     {
         if (statement.Value != null)
-            CompileExpression(statement.Value, writer);
+            CompileExpression(statement.Value);
 
-        writer.Emit(OpCode.RET);
+        Emit(OpCode.RET);
     }
 
-    void CompileStatement(Statement st, IByteWriter? writer = null)
+    void CompileStatement(Statement st)
     {
-        if (writer == null)
-            writer = compilerWriter;
         switch (st)
         {
             case ReturnStatement ret :
-                CompileReturn(ret, writer);
+                CompileReturn(ret);
             break;
 
             case VarDeclStatement var : 
-                CompileVarDef(var, writer);
+                CompileVarDef(var);
             break;
 
             case StatementExpression expr : 
-                CompileExpression(expr.Expression, writer);
+                CompileExpression(expr.Expression);
             break;
 
             case VarAssigmentStatement varAssigment :
-                CompileAssign(varAssigment, writer);
+                CompileAssign(varAssigment);
+            break;
+
+            case BlockStatement block : 
+                CompileStatements(block.Statements);
             break;
 
             case FuncDefineStatement : break;
         }
     }    
 
-    void CompileStatements(Statement[] sts, IByteWriter writer)
+    void CompileStatements(Statement[] sts)
     {
         foreach (var st in sts) 
         {
-            CompileStatement(st, writer);
+            CompileStatement(st);
         }
     }
 
     private void WriteGlobals()
     {
+        Emit(analyzer.GlobalVariables.Count);
         foreach (var global in analyzer.GlobalVariables)
         {
             if (!global.Resolved.IsGlobal)
                 throw new NotImplementedException("There should be here a warning");
-            CompileExpression(global.Value, GlobalWriter);
-            GlobalWriter.Emit(OpCode.STORE_GLOBAL);
-            GlobalWriter.Emit(global.Resolved.ID);
+            CompileExpression(global.Value);
+            Emit(OpCode.STORE_GLOBAL);
+            Emit(global.Resolved.ID);
         }
+        Emit(OpCode.HALT);
     }
 
     private void WriteFunctions()
     {
+        Emit(analyzer.Functions.Count);
+
         foreach (var func in analyzer.Functions)
         {
-            FunctionsWriter.Emit(OpCode.RESERVE_LOCALS);
-            FunctionsWriter.Emit(func.Resolved!.LocalsCount);
-            CompileStatements(func.Block.Statements, FunctionsWriter);
-            FunctionsWriter.Emit(OpCode.RET);
-            FunctionsWriter.Emit(OpCode.HALT);
+            Emit(OpCode.RESERVE_LOCALS);
+            Emit(func.Resolved!.LocalsCount);
+            CompileStatements(func.Block.Statements);
+            Emit(OpCode.RET);
+            Emit(OpCode.HALT);
         }
     }
 
-    public byte[] Comiple()
+    public byte[] Comiple(HeaderCompiler headerCompiler)
     {
+        compiled.AddRange(headerCompiler.Compile());
         WriteGlobals();
         WriteFunctions();
-        CompileStatements(ASTNodes, compilerWriter);
-        compilerWriter.Emit(OpCode.CALL);
-        compilerWriter.Emit(Analyzer.MainFunction!.ID);
-        compilerWriter.Emit(0);
-        return compilerWriter.GetWritedBytesArray();
+        CompileStatements(ASTNodes);
+        Emit(OpCode.CALL);
+        Emit(Analyzer.MainFunction!.ID);
+        Emit(0);
+        Emit(OpCode.HALT);
+        return compiled.ToArray();
     }
 }

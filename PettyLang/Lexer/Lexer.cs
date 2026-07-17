@@ -40,6 +40,8 @@ public class Lexer(string source)
         {"as", TokenType.As},
         {"false", TokenType.False},
         {"true", TokenType.True},
+        {"if", TokenType.If},
+        {"else", TokenType.Else},
     }, 
     Symbols = new()
     {

@@ -24,17 +24,8 @@ public class CompileFabric(Statement[] ast)
 
     public byte[] Build(Analyzer analyzer)
     {
-        var list = new List<byte>();
         var compiler = new Compiler(ast, analyzer);
-        var byteCode = compiler.Comiple();
-        list.AddRange(new HeaderCompiler().Compile());
-        list.AddRange(BitConverter.GetBytes(analyzer.GlobalVariables.Count));
-        list.AddRange(compiler.GlobalWriter.GetWritedBytesArray());
-        list.Add((byte)OpCode.HALT);
-        list.AddRange(BitConverter.GetBytes(analyzer.Functions.Count));
-        list.AddRange(compiler.FunctionsWriter.GetWritedBytesArray());
-        list.AddRange(byteCode);
-        list.Add((byte)OpCode.HALT);
-            return list.ToArray();
+        var byteCode = compiler.Comiple(new HeaderCompiler());
+        return byteCode;
     }
 }

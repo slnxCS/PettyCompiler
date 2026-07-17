@@ -53,3 +53,9 @@ public class ReturnStatement(Expression? value, Position position) : Statement(p
 {
     public readonly Expression? Value = value;
 }
+
+public class IfStatement(Expression condition, BlockStatement block,Position position) : Statement(position)
+{
+    public readonly Expression Condition = condition;
+    public readonly BlockStatement Block = block;
+}

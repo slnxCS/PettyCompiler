@@ -127,7 +127,55 @@ public class Analyzer
                 break;
             }
 
+            case IfStatement @if :
+            {
+                VisitIf(@if);
+                break;
+            }
+
+            case BlockStatement block :
+            {
+                VisitBlock(block);
+                break;
+            }
+
             default : throw new NotImplementedException($"{statement}");
+        }
+    }
+
+    void VisitBlock(BlockStatement statement)
+    {
+        var oldScope = currentScope;
+        currentScope = new(ScopeType.Local, oldScope);
+        try
+        {
+            VisitStatements(statement.Statements);
+        }
+        finally
+        {
+            currentScope = oldScope;
+        }
+    }
+
+    void VisitIf(IfStatement statement)
+    {
+        ensureFunc(statement.Position);
+        var condition = GetInstanceSymbol(ResolveExpression(statement.Condition));
+        if (condition.Type != BuiltIn.BoolClass)
+        {
+            throw new NotImplementedException();
+        }
+
+        var oldScope = currentScope;
+        currentScope = new(ScopeType.Local, oldScope);
+
+        try
+        {
+            VisitStatements(statement.Block.Statements);
+        }
+        finally
+        {
+            currentScope = oldScope;
         }
     }
 

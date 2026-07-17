@@ -1,14 +1,6 @@
-var minusZero : int32 = -1;
-
-func test(a : int32, b : int32, c : int32) : int32 {
-    var d = 10 * minusZero - -10;
-    print(d);
-    var e = a - b - c - d;
-    print(e);
-    return e + 100;
-}
+var x = 10;
 
 func Main() : {
-    var x = true;
     print(x);
+    print(10);
 }

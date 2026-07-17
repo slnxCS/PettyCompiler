@@ -123,6 +123,16 @@ public class Parser
         return new(new(target.Position.Start, endPos), target, @operator, value);
     }
 
+    private IfStatement parseIf()
+    {
+        var startPos = consume(TokenType.If, "Expected if keyword").Position.Start;
+        var condition = parseExpression();
+        var endPos = consume(TokenType.Colon, "Expected ':' after expression").Position.End;
+        var pos = new Position(startPos, endPos);
+        var block = parseBlock();
+        return new(condition, block, pos);
+    }
+
     private Statement parseStatement()
     {
         switch (current.Type)
@@ -138,6 +148,7 @@ public class Parser
             case TokenType.LCurlyBrace : return parseBlock();
             case TokenType.Func : return parseFuncDef();
             case TokenType.Return : return parseReturn();
+            case TokenType.If : return parseIf();
             default : throw new Error($"Unexpected '{current.Type}'", "Syntax", current.Position);
         }
     }
@@ -159,6 +170,7 @@ public class Parser
 
     private Expression[][] ParseFuncCalls()
     {
+        
         var calls = new List<Expression[]>();
         while (match(TokenType.LParen, false)) 
         {
