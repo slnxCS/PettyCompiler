@@ -87,6 +87,10 @@ public class Compiler
                 writer.WriteBytes(_float.Resolved.GetPushBytes());
             break;
 
+            case BoolExpression _bool : 
+                writer.WriteBytes(_bool.Resolved.GetPushBytes());
+            break;
+
             case IdentifierExpression id : 
                 CompileIdentifierExpression(id,  writer);
             break;

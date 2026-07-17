@@ -5,6 +5,7 @@ public enum ConstantType : byte
 {
     CONSTANT_INT = 0,
     CONSTANT_FLOAT = 1,
+    CONSTANT_BOOL = 2,
 }
 
 public abstract record Constant(ConstantType type)
@@ -24,6 +25,14 @@ public record FloatConstant(float value) : Constant(ConstantType.CONSTANT_FLOAT)
     public override byte[] GetBytes()
     {
         return BitConverter.GetBytes(value);
+    }
+}
+
+public record BoolConstant(bool value) : Constant(ConstantType.CONSTANT_BOOL)
+{
+    public override byte[] GetBytes()
+    {
+        return [(byte)(value ? 1 : 0)];
     }
 }
 

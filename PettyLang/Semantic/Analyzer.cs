@@ -9,6 +9,7 @@ public static class BuiltIn {
     public static ClassSymbol VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
     public static Int32ClassSymbol Int32Class = null!;
     public static Float32ClassSymbol Float32Class = null!;
+    public static BoolClassSymbol BoolClass = null!;
     public static ClassSymbol? StringClass = null;
     public static readonly Scope GlobalScope = new(ScopeType.Global, null);
 
@@ -22,6 +23,7 @@ public static class BuiltIn {
 
         Int32Class = new();
         Float32Class = new();
+        BoolClass = new();
         FunctionClass = new("function", GlobalScope, default);
 
         Define();
@@ -54,12 +56,10 @@ public static class BuiltIn {
         GlobalScope.DefineFunc(printFunc);
         AddOverload(printFunc, createParams(("num", Int32Class)), VoidClass, 0);
         AddOverload(printFunc, createParams(("num", Float32Class)), VoidClass, 1);
-        var toFloatFunc = new FunctionSymbol("ToFloat", Int32Class.Members);
-        Int32Class.Members.DefineFunc(toFloatFunc);
-        AddOverload(toFloatFunc, createParams(("number", Int32Class)), Float32Class, 2);
+        AddOverload(printFunc, createParams(("value", BoolClass)), VoidClass, 2);
         var readFunc = new FunctionSymbol("read", GlobalScope);
         GlobalScope.DefineFunc(readFunc);
-        AddOverload(readFunc, Array.Empty<FunctionParameter>(), Int32Class, 3);
+        AddOverload(readFunc, [], Int32Class, 3);
     }
 }
 
@@ -281,6 +281,13 @@ public class Analyzer
                 f.Resolved = new Float32InstanceSymbol(currentScope, BuiltIn.Float32Class, f.Number, f.Position);
                 return f.Resolved;
             }
+
+            case BoolExpression b :
+            {
+                b.Resolved = new(b.Value, currentScope, b.Position);
+                return b.Resolved;
+            }
+
             case StringExpression : return BuiltIn.StringClass ?? 
                 throw new Error("To use the String type, import the String class from the std module (import String from std)", "Semantic", expr.Position);
             case IdentifierExpression id : return ResolveIdentifierExpression(id);

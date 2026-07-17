@@ -154,7 +154,7 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         base.CompileCastBytes(castType, expression, compiler, writer);
     }
 
-    static Dictionary<string, OpCode> operators = new()
+    static readonly Dictionary<string, OpCode> operators = new()
     {
         {"+", OpCode.ADD_FLOAT},
         {"-", OpCode.SUB_FLOAT},
@@ -164,11 +164,8 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
 
     public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler, IByteWriter writer)
     {
-        var lintExpr = expression.Left as FloatExpression;
-        var rintExpr = expression.Right as FloatExpression;
-
-        if (lintExpr == null || rintExpr == null)
-            throw new NotSupportedOperandsError(GetFullName(), expression.RightSymbol.GetFullName(), expression.Operator, expression.Position);
+        var lintExpr = expression.Left;
+        var rintExpr = expression.Right;
         
         compiler.CompileExpression(lintExpr, writer);
         compiler.CompileExpression(rintExpr, writer);
@@ -209,6 +206,25 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
     public override byte[] GetPushBytes()
     {
         return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value ?? throw new NullReferenceException("Value"))))];
+    }
+
+    public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
+    {
+        if (castType is Float32ClassSymbol)
+            return BuiltIn.Float32Class;
+        
+        return base.ResolveCast(castType, expression);
+    }
+
+    public override void CompileCastBytes(ClassSymbol castType, AsExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        if (castType is Float32ClassSymbol)
+        {
+            compiler.CompileExpression(expression.Value, writer);
+            writer.Emit(OpCode.CAST_FROM_INT32_TO_FLOAT32);
+            return;
+        }
+        base.CompileCastBytes(castType, expression, compiler, writer);
     }
 
     static Dictionary<string, OpCode> operators = new()
@@ -283,6 +299,41 @@ public class Float32ClassSymbol : ClassSymbol
     public override Float32InstanceSymbol GetInstance(Scope scope, Position position)
     {
         return new Float32InstanceSymbol(scope, this, null, position);
+    }
+}
+
+public class BoolInstanceSymbol : ClassInstanceSymbol
+{
+    public bool? Value;
+
+    public BoolInstanceSymbol(bool? value, Scope declaredIn, Position position) : base(declaredIn, BuiltIn.BoolClass, position, null)
+    {
+        Value = value;
+    }
+
+    public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        base.CompileBinaryOperation(expression, compiler, writer);
+    }
+
+    public override void CompileCastBytes(ClassSymbol castType, AsExpression expression, Compiler.Compiler compiler, IByteWriter writer)
+    {
+        base.CompileCastBytes(castType, expression, compiler, writer);
+    }
+
+    public override byte[] GetPushBytes()
+    {
+        return BitConverter.GetBytes(ConstantPool.Add(new BoolConstant(Value ?? throw new ArgumentNullException())));
+    }
+}
+
+public class BoolClassSymbol : ClassSymbol
+{
+    public BoolClassSymbol() : base("bool", BuiltIn.GlobalScope, default) { }
+
+    public override BoolInstanceSymbol GetInstance(Scope scope, Position position)
+    {
+        return new BoolInstanceSymbol(null, scope, position);
     }
 }
 

@@ -38,6 +38,8 @@ public class Lexer(string source)
         {"package", TokenType.Package},
         {"return", TokenType.Return},
         {"as", TokenType.As},
+        {"false", TokenType.False},
+        {"true", TokenType.True},
     }, 
     Symbols = new()
     {

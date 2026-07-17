@@ -16,6 +16,12 @@ public class FloatExpression(float number, Position position) : Expression(posit
     public readonly float Number = number;
 }
 
+public class BoolExpression(bool val, Position position) : Expression(position)
+{
+    public BoolInstanceSymbol Resolved = null!;
+    public readonly bool Value = val;
+}
+
 public class StringExpression(string str, Position position) : Expression(position)
 {
     public readonly string String = str;

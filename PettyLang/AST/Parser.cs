@@ -293,6 +293,18 @@ public class Parser
                 return new FloatExpression(float.Parse(last.Lexeme), last.Position);
             }
 
+            case TokenType.False :
+            {
+                advance();
+                return new BoolExpression(false, last.Position);
+            }
+
+            case TokenType.True :
+            {
+                advance();
+                return new BoolExpression(true, last.Position);
+            }
+
             case TokenType.String :
             {
                 advance();

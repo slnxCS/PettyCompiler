@@ -9,8 +9,6 @@ func test(a : int32, b : int32, c : int32) : int32 {
 }
 
 func Main() : {
-    var y = 15.9;
-    var x : int32 = y as int32;
+    var x = true;
     print(x);
-    print(test(10,20,30));
 }
