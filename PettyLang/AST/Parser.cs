@@ -234,7 +234,19 @@ public class Parser
 
     private Expression parseExpression()
     {
-        return parseAdditive();
+        return parseEquals();
+    }
+
+    private Expression parseEquals()
+    {
+        var ex = parseAdditive();
+        while (match(TokenType.Equals))
+        {
+            var right = parseAdditive();
+            ex = new BinaryExpression(new(ex.Position.Start, right.Position.End), ex, "==", right);
+        }
+
+        return ex;
     }
 
     private Expression parseAdditive()

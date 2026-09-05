@@ -3,66 +3,6 @@ using PettyLang.Errors;
 
 namespace PettyLang.Semantic;
 
-public static class BuiltIn {
-    private static bool inited = false;
-
-    public static ClassSymbol VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
-    public static Int32ClassSymbol Int32Class = null!;
-    public static Float32ClassSymbol Float32Class = null!;
-    public static BoolClassSymbol BoolClass = null!;
-    public static ClassSymbol? StringClass = null;
-    public static readonly Scope GlobalScope = new(ScopeType.Global, null);
-
-    public static void Init()
-    {
-        if (inited) return;
-        else inited = true;
-
-        ObjectClass = new("Object", GlobalScope, default);
-        VoidClass = new("void", GlobalScope, default);
-
-        Int32Class = new();
-        Float32Class = new();
-        BoolClass = new();
-        FunctionClass = new("function", GlobalScope, default);
-
-        Define();
-    }
-
-    static FunctionParameter[] createParams(params (string, ClassSymbol)[] parameters)
-    {
-        FunctionParameter[] @params = new FunctionParameter[parameters.Length];
-        for (int i = 0; i < parameters.Length; i++)
-        {
-            var param = parameters[i];
-            @params[i] = new(param.Item1, default, param.Item2);
-        }
-        return @params;
-    }
-
-    static void AddOverload(FunctionSymbol func, FunctionParameter[] @params, ClassSymbol returnType, int id)
-    {
-        func.AddOverload(new BuiltInFunctionOverload(@params, returnType, id));
-    }
-
-    public static void Define()
-    {
-        GlobalScope.DefineClass(Int32Class);
-        GlobalScope.DefineClass(Float32Class);
-        GlobalScope.DefineClass(VoidClass);
-        if (StringClass != null) GlobalScope.DefineClass(StringClass);
-
-        var printFunc = new FunctionSymbol("print", GlobalScope);
-        GlobalScope.DefineFunc(printFunc);
-        AddOverload(printFunc, createParams(("num", Int32Class)), VoidClass, 0);
-        AddOverload(printFunc, createParams(("num", Float32Class)), VoidClass, 1);
-        AddOverload(printFunc, createParams(("value", BoolClass)), VoidClass, 2);
-        var readFunc = new FunctionSymbol("read", GlobalScope);
-        GlobalScope.DefineFunc(readFunc);
-        AddOverload(readFunc, [], Int32Class, 3);
-    }
-}
-
 public class Analyzer
 {
     private Scope currentScope = BuiltIn.GlobalScope;
@@ -260,6 +200,7 @@ public class Analyzer
             MainFunction = ov;
         }
 
+        var oldFunc = currentFunction;
         currentFunction = ov;
         var lastScope = currentScope;
         currentScope = new Scope(ScopeType.Function, currentScope);
@@ -280,7 +221,7 @@ public class Analyzer
         {
             ov.LocalsCount = currentScope.GetFreeVarID();
             currentScope = lastScope;
-            currentFunction = null;
+            currentFunction = oldFunc;
             if (!returnFinded && ov.ReturnType != BuiltIn.VoidClass) 
                 throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", func.Position);
         }
@@ -431,7 +372,7 @@ public class Analyzer
                 part.Resolved = _v;
                 return _v;
             }
-            var _c = lookingScope.GetClass(part.ID, local) ?? throw new Error(errorMsg, "Semantic", part.Position);
+            var _c = lookingScope.GetClass(part.ID, local) ?? lookingScope.GetFunc(part.ID, local)?.Type ?? throw new Error(errorMsg, "Semantic", part.Position);
             part.Resolved = _c;
             return _c;
         }
@@ -449,7 +390,7 @@ public class Analyzer
                 part.ResolvedOverload = ov;
                 part.ResolvedParameters = resolved;
             //}
-            return ov.ReturnType;
+            return GetInstanceSymbol(ov.ReturnType, part.Position);
         }
     }
 

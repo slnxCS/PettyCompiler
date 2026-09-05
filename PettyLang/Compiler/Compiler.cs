@@ -35,6 +35,7 @@ public enum OpCode : byte
     JMP_IF_FALSE = 26,
     JMP_IF_TRUE = 27,
     JMP = 28,
+    INT_EQ = 29,
 }
 
 public class Compiler
@@ -210,7 +211,7 @@ public class Compiler
     }    
 
     void CompileIf(IfStatement statement)
-    {
+    {   
         CompileExpression(statement.Condition);
         Emit(OpCode.JMP_IF_FALSE);
         var oldLen = compiled.Count;
@@ -245,8 +246,12 @@ public class Compiler
     {
         Emit(analyzer.Functions.Count);
 
-        foreach (var func in analyzer.Functions)
+        for (int i = 0; i < analyzer.Functions.Count; i++)
         {
+            var func = analyzer.Functions[i];
+            #warning КОСТЫЛЬ
+            if (func.Resolved!.ID != i)
+                func.Resolved.ID = i;
             Emit(OpCode.RESERVE_LOCALS);
             Emit(func.Resolved!.LocalsCount);
             CompileStatements(func.Block.Statements);

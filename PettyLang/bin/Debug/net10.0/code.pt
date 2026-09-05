@@ -1,9 +1,4 @@
-var x = 10;
-
 func Main() : {
-    print(x);
     print(10);
-    if true : {
-        print(true);
-    }
+    Main();
 }

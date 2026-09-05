@@ -238,6 +238,7 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         {"-", OpCode.SUB_INT},
         {"*", OpCode.MUL_INT},
         {"/", OpCode.DIV_INT},
+        {"==", OpCode.INT_EQ},
     };
 
     public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler)
@@ -261,6 +262,7 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
             "-" => BuiltIn.Int32Class,
             "*" => BuiltIn.Int32Class,
             "/" => BuiltIn.Float32Class,
+            "==" => BuiltIn.BoolClass,
           _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
         };
     }
