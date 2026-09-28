@@ -1,4 +1,20 @@
+func sum(a : int32, b : int32) : int32 {
+    return a + b;
+}
+
+func sum(a : float32, b : float32) : float32 {
+    return a + b;
+}
+
+func sum_print(a : float32, b : float32) : {
+    print(sum(a,b));
+}
+
+func sum_print(a : int32, b : int32) : {
+    print(sum(a,b));
+}
+
 func Main() : {
-    print(10);
-    Main();
+    sum_print(10,20);
+    sum_print(10.54, 20.50);
 }

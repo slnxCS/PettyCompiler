@@ -242,16 +242,20 @@ public class Compiler
         Emit(OpCode.HALT);
     }
 
+    private void SortFunctionsByID()
+    {
+        analyzer.Functions = analyzer.Functions.OrderBy(x => x.Resolved?.ID ?? throw new Error($"Function {x.Name} is not resolved", "compiler", x.Position)).ToList();
+    }
+
     private void WriteFunctions()
     {
         Emit(analyzer.Functions.Count);
 
+        SortFunctionsByID();
+
         for (int i = 0; i < analyzer.Functions.Count; i++)
         {
             var func = analyzer.Functions[i];
-            #warning КОСТЫЛЬ
-            if (func.Resolved!.ID != i)
-                func.Resolved.ID = i;
             Emit(OpCode.RESERVE_LOCALS);
             Emit(func.Resolved!.LocalsCount);
             CompileStatements(func.Block.Statements);
@@ -262,12 +266,13 @@ public class Compiler
 
     public byte[] Comiple(HeaderCompiler headerCompiler)
     {
+        compiled.Clear();
         compiled.AddRange(headerCompiler.Compile());
         WriteGlobals();
         WriteFunctions();
         CompileStatements(ASTNodes);
         Emit(OpCode.CALL);
-        Emit(Analyzer.MainFunction!.ID);
+        Emit(Analyzer.MainFunction?.ID ?? throw new Error("Missing main function (entry point)", "compiler", default));
         Emit(0);
         Emit(OpCode.HALT);
         return compiled.ToArray();

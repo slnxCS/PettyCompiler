@@ -378,9 +378,7 @@ public class Analyzer
         }
         else
         {
-            var sym = lookingScope.GetFunc(part.ID, local);
-            if (sym == null) 
-                throw new Error(errorMsg, "Semantic", part.Position);
+            var sym = lookingScope.GetFunc(part.ID, local) ?? throw new Error(errorMsg, "Semantic", part.Position);
             part.Resolved = sym;
             //for (int i = 0; i < part.FuncCallsArguments.Length; i++)
             //{
@@ -396,7 +394,7 @@ public class Analyzer
 
     Symbol ResolveIdentifierExpression(IdentifierExpression identifier)
     {
-        Scope lookingScope = currentScope;
+        Scope lookingScope;
         Symbol sym = ResolveExpression(identifier.FirstPart);
 
         for (int i = 0; i < identifier.OtherParts.Length; i++)
