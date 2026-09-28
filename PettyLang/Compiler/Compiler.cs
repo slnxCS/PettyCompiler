@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 using PettyLang.AST;
 using PettyLang.Errors;
 using PettyLang.Semantic;
@@ -54,6 +55,11 @@ public class Compiler
     public void Emit(int value)
     {
         compiled.AddRange(BitConverter.GetBytes(value));
+    }
+
+    public void Emit(string text)
+    {
+        compiled.AddRange(Encoding.UTF8.GetBytes(text));
     }
 
     public void Emit(float value)
@@ -244,11 +250,18 @@ public class Compiler
 
     private void SortFunctionsByID()
     {
-        analyzer.Functions = analyzer.Functions.OrderBy(x => x.Resolved?.ID ?? throw new Error($"Function {x.Name} is not resolved", "compiler", x.Position)).ToList();
+        analyzer.Functions = analyzer.Functions.OrderBy(x => x.Resolved?.ID 
+            ?? throw new Error($"Function {x.Name} is not resolved", "compiler", x.Position)).ToList();
     }
 
-    private void WriteFunctions()
+    private void SortClassesByID()
     {
+        analyzer.Classes = analyzer.Classes.OrderBy(x => x.Resolved?.ID 
+            ?? throw new Error($"Class '{x.Name}' is not resolved", "compiler", x.Position)).ToList();
+    }
+
+
+    private void WriteFunctions() {
         Emit(analyzer.Functions.Count);
 
         SortFunctionsByID();
@@ -262,6 +275,24 @@ public class Compiler
             Emit(OpCode.RET);
             Emit(OpCode.HALT);
         }
+
+    }
+
+    private void WriteClasses()
+    {
+        Emit(analyzer.Classes.Count);
+
+        SortClassesByID();
+        
+        for (int i = 0; i < analyzer.Classes.Count; i++)
+        {
+            var @class = analyzer.Classes[i];
+            if (@class.Resolved == null)
+                throw new Error($"Class '{@class.Name}' is not resolved", "compiler", @class.Position);
+
+            Emit(@class.Name);
+            Emit(@class.Resolved.Derived?.ID ?? -1);
+        }
     }
 
     public byte[] Comiple(HeaderCompiler headerCompiler)
@@ -270,6 +301,7 @@ public class Compiler
         compiled.AddRange(headerCompiler.Compile());
         WriteGlobals();
         WriteFunctions();
+        WriteClasses();
         CompileStatements(ASTNodes);
         Emit(OpCode.CALL);
         Emit(Analyzer.MainFunction?.ID ?? throw new Error("Missing main function (entry point)", "compiler", default));

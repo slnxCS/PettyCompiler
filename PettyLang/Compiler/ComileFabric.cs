@@ -18,6 +18,8 @@ public class CompileFabric(Statement[] ast)
     HALT
     FUNCTIONS_COUNT
     FUNCTIONS
+    CLASS_COUNT
+    CLASS_TABLE
     BYTE_CODE
     (HALT)
     */

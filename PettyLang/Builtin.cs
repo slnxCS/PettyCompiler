@@ -1,3 +1,4 @@
+using PettyLang.AST;
 using PettyLang.Semantic;
 
 namespace PettyLang;
@@ -31,9 +32,9 @@ public static class BuiltIn {
 
     private static BuiltinFunction[] BuiltinFunctions = null!;
 
-    private static bool inited = false;
+    public static bool inited {get; private set; } = false;
 
-    public static ClassSymbol VoidClass = null!, ObjectClass = null!, FunctionClass = null!;
+    public static ClassSymbol VoidClass = null!, ObjectClass = null!, ValueObjectClass = null!, FunctionClass = null!;
     public static Int32ClassSymbol Int32Class = null!;
     public static Float32ClassSymbol Float32Class = null!;
     public static BoolClassSymbol BoolClass = null!;
@@ -45,13 +46,14 @@ public static class BuiltIn {
         if (inited) return;
         else inited = true;
 
-        ObjectClass = new("Object", GlobalScope, default);
-        VoidClass = new("void", GlobalScope, default);
+        ObjectClass = new("Object", GlobalScope, default, null);
+        ValueObjectClass = new("ValueObject", GlobalScope, default, ObjectClass);
+        VoidClass = new("void", GlobalScope, default, ObjectClass);
 
         Int32Class = new();
         Float32Class = new();
         BoolClass = new();
-        FunctionClass = new("function", GlobalScope, default);
+        FunctionClass = new("function", GlobalScope, default, ObjectClass);
 
         BuiltinFunctions =
         [

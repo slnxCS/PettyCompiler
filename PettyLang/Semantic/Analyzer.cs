@@ -10,11 +10,31 @@ public class Analyzer
     public static FunctionOverload? MainFunction;
     public List<VarDeclStatement> GlobalVariables = new();
     public List<FuncDefineStatement> Functions = new();
+    public List<ClassDefineStatement> Classes = new();
     private bool returnFinded;
+
+    private void AddClassToList(ClassSymbol @class)
+    {
+        Classes.Add(new ClassDefineStatement(@class.Position, @class.Name, null, null) {Resolved = @class});
+    }
+
+    private void InitClassList()
+    {
+        if (!BuiltIn.inited) BuiltIn.Init();
+
+        AddClassToList(BuiltIn.ObjectClass);
+        AddClassToList(BuiltIn.ValueObjectClass);
+        AddClassToList(BuiltIn.VoidClass);
+        AddClassToList(BuiltIn.Int32Class);
+        AddClassToList(BuiltIn.Float32Class);
+        AddClassToList(BuiltIn.BoolClass);
+        AddClassToList(BuiltIn.FunctionClass);
+    }
 
     public Analyzer()
     {
         BuiltIn.Init();
+        InitClassList();
     }
 
     public void Analyze(Statement[] AST)

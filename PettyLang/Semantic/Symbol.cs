@@ -9,14 +9,13 @@ public abstract class Symbol
     protected Symbol(string name, int? id, ClassSymbol? type, Scope declaredIn, Position position)
     {
         Name = name;
-        if (id is int _id)
-            ID = _id;
+        ID = id ?? 0;
         Type = type ?? (this as ClassSymbol)!;
         DeclaredIn = declaredIn;
         Position = position;
     }
 
-    public readonly string Name;
+    public string Name {get; protected set; }
     public int ID;
     public ClassSymbol Type;
     public virtual Scope? Members => null;
@@ -111,7 +110,7 @@ public class VarSymbol : Symbol
 
 public class ClassInstanceSymbol : Symbol
 {
-    public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position, string? name) : base(name ?? @class.GetFullName(), null, @class, declaredIn, position)
+    public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position) : base(@class.GetFullName(), null, @class, declaredIn, position)
     {
         selfScope = new(ScopeType.Instance, DeclaredIn);
     }
@@ -130,7 +129,7 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
     public float? Value;
     public bool IsConstant => Value != null;
 
-    public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position) : base(globalScope, floatClass ?? BuiltIn.Float32Class, position, null)
+    public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position) : base(globalScope, floatClass ?? BuiltIn.Float32Class, position)
     {
         Value = value;
         if (Value != null)
@@ -200,7 +199,7 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
     public int? Value;
     public bool IsConstant => Value != null;
 
-    public Int32InstanceSymbol(Scope globalScope, ClassSymbol intClass, int? value, Position position) : base(globalScope, intClass, position, null)
+    public Int32InstanceSymbol(Scope globalScope, ClassSymbol intClass, int? value, Position position) : base(globalScope, intClass, position)
     {
         Value = value;
         
@@ -270,13 +269,16 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
 
 public class ClassSymbol : Symbol
 {
-    public ClassSymbol(string name, Scope declaredIn, Position position) : base(name, declaredIn.GetFreeClassID(), null, declaredIn, position)
+    protected Scope ClassScope;
+    public ClassSymbol? Derived;
+    public override Scope Members => ClassScope;
+
+    public ClassSymbol(string name, Scope declaredIn, Position position, ClassSymbol? derived) : 
+        base(name, BuiltIn.GlobalScope.GetFreeClassID(), null, declaredIn, position)
     {
         ClassScope = new(ScopeType.Class, declaredIn);
+        Derived = derived;
     }
-
-    protected Scope ClassScope;
-    public override Scope Members => ClassScope;
 
     public override byte[] GetPushBytes()
     {
@@ -285,13 +287,13 @@ public class ClassSymbol : Symbol
 
     public virtual ClassInstanceSymbol GetInstance(Scope scope, Position position)
     {
-        return new(scope, this, position, null);
+        return new(scope, this, position);
     }
 }
 
 public class Int32ClassSymbol : ClassSymbol
 {
-    public Int32ClassSymbol() : base("int32", BuiltIn.GlobalScope, default) { }
+    public Int32ClassSymbol() : base("int32", BuiltIn.GlobalScope, default, BuiltIn.ValueObjectClass) { }
 
     public override Int32InstanceSymbol GetInstance(Scope scope, Position position)
     {
@@ -301,7 +303,7 @@ public class Int32ClassSymbol : ClassSymbol
 
 public class Float32ClassSymbol : ClassSymbol
 {
-    public Float32ClassSymbol() : base("float32", BuiltIn.GlobalScope, default) { }
+    public Float32ClassSymbol() : base("float32", BuiltIn.GlobalScope, default, BuiltIn.ValueObjectClass) { }
 
     public override Float32InstanceSymbol GetInstance(Scope scope, Position position)
     {
@@ -313,7 +315,7 @@ public class BoolInstanceSymbol : ClassInstanceSymbol
 {
     public bool? Value;
 
-    public BoolInstanceSymbol(bool? value, Scope declaredIn, Position position) : base(declaredIn, BuiltIn.BoolClass, position, null)
+    public BoolInstanceSymbol(bool? value, Scope declaredIn, Position position) : base(declaredIn, BuiltIn.BoolClass, position)
     {
         Value = value;
 
@@ -330,7 +332,7 @@ public class BoolInstanceSymbol : ClassInstanceSymbol
 
 public class BoolClassSymbol : ClassSymbol
 {
-    public BoolClassSymbol() : base("bool", BuiltIn.GlobalScope, default) { }
+    public BoolClassSymbol() : base("bool", BuiltIn.GlobalScope, default, BuiltIn.ValueObjectClass) { }
 
     public override BoolInstanceSymbol GetInstance(Scope scope, Position position)
     {
@@ -357,9 +359,9 @@ public class FunctionSymbol : ClassInstanceSymbol
         return ar;
     }
 
-    public FunctionSymbol(string name, Scope declaredIn) : base(declaredIn, BuiltIn.FunctionClass, default, name)
+    public FunctionSymbol(string name, Scope declaredIn) : base(declaredIn, BuiltIn.FunctionClass, default)
     {
-
+        this.Name = name;
     }
 
     private readonly List<FunctionOverload> Overloads = new();

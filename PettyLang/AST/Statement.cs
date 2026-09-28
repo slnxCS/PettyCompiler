@@ -49,6 +49,16 @@ public class FuncDefineStatement
     public FunctionOverload? Resolved = null;
 }
 
+public class ClassDefineStatement
+    (Position position, string name, BlockStatement? block, IdentifierExpression? derived) : Statement(position)
+{
+    public readonly string Name = name;
+    public readonly BlockStatement? Block = block;
+    public readonly IdentifierExpression? Derived = derived;
+
+    public ClassSymbol? Resolved = null;
+}
+
 public class ReturnStatement(Expression? value, Position position) : Statement(position)
 {
     public readonly Expression? Value = value;
