@@ -29,7 +29,7 @@ public class Program
         var outputName = "compiled.pt";
 
         var source = File.ReadAllText(filePath);
-
+        
         //try 
         //{
             

@@ -290,12 +290,14 @@ public class Compiler
             if (@class.Resolved == null)
                 throw new Error($"Class '{@class.Name}' is not resolved", "compiler", @class.Position);
 
+            Emit(@class.Name.Length);
             Emit(@class.Name);
+            Emit(@class.Resolved.ID);
             Emit(@class.Resolved.Derived?.ID ?? -1);
         }
     }
 
-    public byte[] Comiple(HeaderCompiler headerCompiler)
+    public byte[] Compile(HeaderCompiler headerCompiler)
     {
         compiled.Clear();
         compiled.AddRange(headerCompiler.Compile());

@@ -27,7 +27,7 @@ public class CompileFabric(Statement[] ast)
     public byte[] Build(Analyzer analyzer)
     {
         var compiler = new Compiler(ast, analyzer);
-        var byteCode = compiler.Comiple(new HeaderCompiler());
+        var byteCode = compiler.Compile(new HeaderCompiler());
         return byteCode;
     }
 }
