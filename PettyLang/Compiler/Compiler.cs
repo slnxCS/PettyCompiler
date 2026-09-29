@@ -301,9 +301,11 @@ public class Compiler
     {
         compiled.Clear();
         compiled.AddRange(headerCompiler.Compile());
-        WriteGlobals();
         WriteFunctions();
         WriteClasses();
+
+        
+        WriteGlobals();
         CompileStatements(ASTNodes);
         Emit(OpCode.CALL);
         Emit(Analyzer.MainFunction?.ID ?? throw new Error("Missing main function (entry point)", "compiler", default));

@@ -1,3 +1,11 @@
+func sum(a : int32, b : int32) : int32 {
+    var tmp = a + b;
+    print(tmp);
+    return tmp;
+}
+
+var counter = sum(200, -10);
+
 func Main() : {
-    print(1);
+    print(counter);
 }
