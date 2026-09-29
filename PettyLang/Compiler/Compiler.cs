@@ -206,6 +206,7 @@ public class Compiler
             break;
 
             case FuncDefineStatement : break;
+            case ClassDefineStatement : break;
 
             case IfStatement @if :
                 CompileIf(@if);
@@ -294,6 +295,7 @@ public class Compiler
             Emit(@class.Name);
             Emit(@class.Resolved.ID);
             Emit(@class.Resolved.Derived?.ID ?? -1);
+            Emit(@class.Resolved.Members.Variables.Count);
         }
     }
 

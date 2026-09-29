@@ -42,6 +42,7 @@ public class Lexer(string source)
         {"true", TokenType.True},
         {"if", TokenType.If},
         {"else", TokenType.Else},
+        {"class", TokenType.Class},
     }, 
     Symbols = new()
     {

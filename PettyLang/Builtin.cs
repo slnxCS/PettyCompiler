@@ -83,6 +83,10 @@ public static class BuiltIn {
         GlobalScope.DefineClass(Float32Class);
         GlobalScope.DefineClass(VoidClass);
         GlobalScope.DefineClass(FunctionClass);
+        GlobalScope.DefineClass(ObjectClass);
+        GlobalScope.DefineClass(ValueObjectClass);
+        GlobalScope.DefineClass(BoolClass);
+        
         if (StringClass != null) GlobalScope.DefineClass(StringClass);
 
         foreach (var bf in BuiltinFunctions)

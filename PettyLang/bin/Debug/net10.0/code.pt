@@ -1,11 +1,8 @@
-func sum(a : int32, b : int32) : int32 {
-    var tmp = a + b;
-    print(tmp);
-    return tmp;
+class Vector : {
+    var X : int32 = 0;
+    var Y : int32 = 0;
 }
 
-var counter = sum(200, -10);
-
 func Main() : {
-    print(counter);
+    
 }

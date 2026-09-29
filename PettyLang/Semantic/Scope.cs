@@ -24,6 +24,7 @@ public class Scope
     public readonly ScopeType Type;
 
     private Dictionary<string, VarSymbol> variables = new();
+    public IReadOnlyDictionary<string, VarSymbol> Variables => variables;
     private Dictionary<string, FunctionSymbol> functions = new();
     private Dictionary<string, ClassSymbol> classes = new();
     

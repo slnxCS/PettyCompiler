@@ -133,6 +133,23 @@ public class Parser
         return new(condition, block, pos);
     }
 
+    private ClassDefineStatement parseClass()
+    {
+        var startPos = consume(TokenType.Class, "Expected 'class' keyword").Position.Start;
+        var name = consume(TokenType.Identifier, "Expected class name").Lexeme;
+        var endPos = consume(TokenType.Colon, "Expected ':' after class name").Position.End;
+        IdentifierExpression? derivedName = null;
+        if (!match(TokenType.LCurlyBrace, false))
+        {
+            derivedName = parseIdentifier();
+            endPos = derivedName.Position.End;
+        }
+
+        var block = parseBlock();
+
+        return new (new(startPos, endPos), name, block, derivedName);
+    }
+
     private Statement parseStatement()
     {
         switch (current.Type)
@@ -147,6 +164,7 @@ public class Parser
             case TokenType.Var : return parseVarAssign();
             case TokenType.LCurlyBrace : return parseBlock();
             case TokenType.Func : return parseFuncDef();
+            case TokenType.Class : return parseClass();
             case TokenType.Return : return parseReturn();
             case TokenType.If : return parseIf();
             default : throw new Error($"Unexpected '{current.Type}'", "Syntax", current.Position);

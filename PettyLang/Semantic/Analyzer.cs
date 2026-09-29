@@ -99,7 +99,41 @@ public class Analyzer
                 break;
             }
 
+            case ClassDefineStatement @class :
+            {
+                VisitClass(@class);
+                break;
+            }
+
             default : throw new NotImplementedException($"{statement}");
+        }
+    }
+
+    void VisitClass(ClassDefineStatement @class) 
+    {
+        ClassSymbol? derived = null;
+        if (@class.Derived != null)
+        {
+            var derivedSym = ResolveIdentifierExpression(@class.Derived);
+            derived = derivedSym as ClassSymbol ?? 
+                throw new Error($"Class must derived from another class, not {derivedSym.GetType().Name}", "Semantic", @class.Derived.Position);
+        }
+        var sym = new ClassSymbol(@class.Name, currentScope, @class.Position, derived);
+        @class.Resolved = sym;
+        currentScope.DefineClass(sym);
+
+        var oldScope = currentScope;
+        currentScope = sym.Members;
+
+        Classes.Add(@class);
+
+        try
+        {
+            if (@class.Block != null) VisitStatements(@class.Block.Statements);
+        }
+        finally
+        {
+            currentScope = oldScope;
         }
     }
 
