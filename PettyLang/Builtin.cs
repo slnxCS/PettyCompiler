@@ -32,7 +32,7 @@ public static class BuiltIn {
 
     private static BuiltinFunction[] BuiltinFunctions = null!;
 
-    public static bool inited {get; private set; } = false;
+    public static bool Inited {get; private set; } = false;
 
     public static ClassSymbol VoidClass = null!, ObjectClass = null!, ValueObjectClass = null!, FunctionClass = null!;
     public static Int32ClassSymbol Int32Class = null!;
@@ -43,8 +43,8 @@ public static class BuiltIn {
 
     public static void Init()
     {
-        if (inited) return;
-        else inited = true;
+        if (Inited) return;
+        else Inited = true;
 
         ObjectClass = new("Object", GlobalScope, default, null);
         ValueObjectClass = new("ValueObject", GlobalScope, default, ObjectClass);

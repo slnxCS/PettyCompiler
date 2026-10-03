@@ -37,6 +37,9 @@ public enum OpCode : byte
     JMP_IF_TRUE = 27,
     JMP = 28,
     INT_EQ = 29,
+
+    ALLOCATE_OBJ = 25,
+    CALL_METHOD = 30,
 }
 
 public class Compiler
@@ -132,19 +135,6 @@ public class Compiler
             default : throw new NotImplementedException(ex.ToString());
         }
     }
-
-    //void CompileBinary(BinaryExpression bin, IByteWriter writer)
-    //{
-    //    CompileExpression(bin.Left, writer);
-    //    CompileExpression(bin.Right, writer);
-//
-    //    if (bin.LeftSymbol.Type == BuiltIn.Int32Class && bin.RightSymbol.Type == BuiltIn.Int32Class)
-    //        writer.Emit(intOperators[bin.Operator]);
-    //    else if (bin.LeftSymbol.Type == BuiltIn.Float32Class && bin.RightSymbol.Type == BuiltIn.Float32Class)
-    //        writer.Emit(floatOperators[bin.Operator]);
-//
-    //    else throw new NotImplementedException();
-    //}
 
     void CompileIdentifierExpressionPart(IdentifierExpressionPart part)
     {
@@ -249,9 +239,9 @@ public class Compiler
         Emit(OpCode.HALT);
     }
 
-    private void SortFunctionsByID()
+    private void SortFunctionsByID(List<FuncDefineStatement> functions)
     {
-        analyzer.Functions = analyzer.Functions.OrderBy(x => x.Resolved?.ID 
+        functions = functions.OrderBy(x => x.Resolved?.ID 
             ?? throw new Error($"Function {x.Name} is not resolved", "compiler", x.Position)).ToList();
     }
 
@@ -262,14 +252,14 @@ public class Compiler
     }
 
 
-    private void WriteFunctions() {
-        Emit(analyzer.Functions.Count);
+    private void WriteFunctions(List<FuncDefineStatement> functions) {
+        Emit(functions.Count);
 
-        SortFunctionsByID();
+        SortFunctionsByID(functions);
 
-        for (int i = 0; i < analyzer.Functions.Count; i++)
+        for (int i = 0; i < functions.Count; i++)
         {
-            var func = analyzer.Functions[i];
+            var func = functions[i];
             Emit(OpCode.RESERVE_LOCALS);
             Emit(func.Resolved!.LocalsCount);
             CompileStatements(func.Block.Statements);
@@ -291,11 +281,14 @@ public class Compiler
             if (@class.Resolved == null)
                 throw new Error($"Class '{@class.Name}' is not resolved", "compiler", @class.Position);
 
-            Emit(@class.Name.Length);
+            Emit(Encoding.UTF8.GetByteCount(@class.Name));
             Emit(@class.Name);
             Emit(@class.Resolved.ID);
             Emit(@class.Resolved.Derived?.ID ?? -1);
             Emit(@class.Resolved.Members.Variables.Count);
+            if (analyzer.Methods.ContainsKey(@class.Resolved))
+                WriteFunctions(analyzer.Methods[@class.Resolved]);
+            else Emit(0);
         }
     }
 
@@ -303,15 +296,17 @@ public class Compiler
     {
         compiled.Clear();
         compiled.AddRange(headerCompiler.Compile());
-        WriteFunctions();
+        WriteFunctions(analyzer.Functions);
         WriteClasses();
 
         
         WriteGlobals();
         CompileStatements(ASTNodes);
         Emit(OpCode.CALL);
-        Emit(Analyzer.MainFunction?.ID ?? throw new Error("Missing main function (entry point)", "compiler", default));
-        Emit(0);
+        if (Analyzer.MainFunction == null)
+            throw new Error("Missing main function (entry point)", "compiler", default);
+        Emit(Analyzer.MainFunction.ID);
+        Emit(Analyzer.MainFunction.Arity);
         Emit(OpCode.HALT);
         return compiled.ToArray();
     }

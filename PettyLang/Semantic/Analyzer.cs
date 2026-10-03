@@ -7,9 +7,11 @@ public class Analyzer
 {
     private Scope currentScope = BuiltIn.GlobalScope;
     private FunctionOverload? currentFunction = null;
+    private ClassSymbol? currentClass = null;
     public static FunctionOverload? MainFunction;
     public List<VarDeclStatement> GlobalVariables = new();
     public List<FuncDefineStatement> Functions = new();
+    public Dictionary<ClassSymbol, List<FuncDefineStatement>> Methods = new();
     public List<ClassDefineStatement> Classes = new();
     private bool returnFinded;
 
@@ -20,7 +22,7 @@ public class Analyzer
 
     private void InitClassList()
     {
-        if (!BuiltIn.inited) BuiltIn.Init();
+        if (!BuiltIn.Inited) BuiltIn.Init();
 
         AddClassToList(BuiltIn.ObjectClass);
         AddClassToList(BuiltIn.ValueObjectClass);
@@ -122,9 +124,11 @@ public class Analyzer
         @class.Resolved = sym;
         currentScope.DefineClass(sym);
 
+        var oldClass = currentClass;
         var oldScope = currentScope;
         currentScope = sym.Members;
 
+        currentClass = sym;
         Classes.Add(@class);
 
         try
@@ -133,7 +137,15 @@ public class Analyzer
         }
         finally
         {
+            if (!currentScope.Functions.Any(x => x.Value is ConstructorFunctionSymbol))
+            {
+                var constructor = new ConstructorFunctionSymbol(sym, true);
+                constructor.AddOverload(new([], sym.Position, sym, null));
+                BuiltIn.GlobalScope.DefineFunc(constructor);
+                
+            }
             currentScope = oldScope;
+            currentClass = oldClass;
         }
     }
 
@@ -223,10 +235,15 @@ public class Analyzer
 
     FunctionOverload ResolveFuncDecl(FuncDefineStatement func)
     {
-        var fs = currentScope.GetFunc(func.Name, false);
+        var lastScope = currentScope;
+        currentScope = new Scope(ScopeType.Function, currentScope);
+        var fs = lastScope.GetFunc(func.Name, false);
         if (fs == null) {
-            fs = new (func.Name, currentScope);
-            currentScope.DefineFunc(fs);
+            if (currentClass == null)
+                fs = new FunctionSymbol(func.Name, lastScope);
+            else 
+                fs = new MethodSymbol(new VarSymbol("self", func.Position, currentScope, currentClass, new(currentScope, currentClass, func.Position)), func.Name);
+            lastScope.DefineFunc(fs);
         }
 
         var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null? BuiltIn.VoidClass : 
@@ -256,8 +273,6 @@ public class Analyzer
 
         var oldFunc = currentFunction;
         currentFunction = ov;
-        var lastScope = currentScope;
-        currentScope = new Scope(ScopeType.Function, currentScope);
         returnFinded = false;
 
         for (int i = 0; i < ov.Arity; i++)
@@ -279,8 +294,14 @@ public class Analyzer
             if (!returnFinded && ov.ReturnType != BuiltIn.VoidClass) 
                 throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", func.Position);
         }
-
-        Functions.Add(func);
+        if (currentClass == null)
+            Functions.Add(func);
+        else 
+        {
+            if (!Methods.ContainsKey(currentClass))
+                Methods.Add(currentClass, new());
+            Methods[currentClass].Add(func);
+        }
 
         return ov;
     }
@@ -417,7 +438,7 @@ public class Analyzer
     Symbol ResolveIdentifierPart(IdentifierExpressionPart part, Scope lookingScope, bool local, Symbol? lastSym)
     {
         var errorMsg = lastSym == null ? $"Name '{part.ID}' does not exist in current context"
-            : $"Class '{lastSym.Type.GetFullName()}' does not contains field with name '{part.ID}'";
+            : $"'{lastSym.Type.GetFullName()}' does not contains field with name '{part.ID}'";
         if (part.FuncCallsArguments.Length == 0)
         {
             var _v = lookingScope.GetVar(part.ID, local);

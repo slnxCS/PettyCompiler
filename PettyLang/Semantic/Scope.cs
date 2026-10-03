@@ -15,9 +15,13 @@ public class Scope
         Parent = parent;
         Type = type;
 
-        if (Type == ScopeType.Global || Parent == null) freeIDSet = GlobalFreeIDSet;
-        else if (Parent.Type == ScopeType.Global) freeIDSet = new();
-        else freeIDSet = Parent.freeIDSet;
+        freeIDSet = Type switch
+        {
+            ScopeType.Global => GlobalFreeIDSet,
+            ScopeType.Package or ScopeType.Function or ScopeType.Instance or ScopeType.Class => new(),
+            ScopeType.Local => Parent!.freeIDSet,
+            _ => new(),
+        };
     }
 
     public readonly Scope? Parent;
@@ -26,16 +30,18 @@ public class Scope
     private Dictionary<string, VarSymbol> variables = new();
     public IReadOnlyDictionary<string, VarSymbol> Variables => variables;
     private Dictionary<string, FunctionSymbol> functions = new();
+    public IReadOnlyDictionary<string, FunctionSymbol> Functions => functions;
     private Dictionary<string, ClassSymbol> classes = new();
+    public IReadOnlyDictionary<string, ClassSymbol> Classes => classes;
     
     public class IDSet
     {
-        public int FreeVarID;
-        public int FreeFuncID;
-        public int FreeClassID;
+        public int FreeVarID = 0;
+        public int FreeFuncID = 0;
+        public int FreeClassID = 0;
     }
 
-    public static IDSet GlobalFreeIDSet = new();
+    private static IDSet GlobalFreeIDSet = new();
     private IDSet freeIDSet;
 
     public int GetFreeVarID()
@@ -45,12 +51,26 @@ public class Scope
 
     public int GetFreeFuncID()
     {
-        return GlobalFreeIDSet.FreeFuncID++;
+        if (Type == ScopeType.Local || Type == ScopeType.Function || Type == ScopeType.Package)
+            return GlobalFreeIDSet.FreeFuncID++;
+        return freeIDSet.FreeFuncID++;
     }
 
     public int GetFreeClassID()
     {
         return freeIDSet.FreeClassID++;
+    }
+
+    public void CopyFromClass(ClassSymbol @class)
+    {
+        if (Type != ScopeType.Instance) 
+            throw new InvalidOperationException();
+
+        var classScope = @class.Members;
+
+        variables = new(classScope.variables);
+        functions = new(classScope.functions);
+        classes = new(classScope.classes);
     }
 
     public VarSymbol? GetVar(string name, bool local)
@@ -65,7 +85,7 @@ public class Scope
         if (GetVar(var.Name!, true) != null) 
             throw new Error($"Variable '{var.Name}' is already exist", "Semantic", var.Position);
 
-        variables.Add(var.Name!, var);
+        variables.Add(var.Name, var);
     }
 
     public FunctionSymbol? GetFunc(string name, bool local)
@@ -79,7 +99,7 @@ public class Scope
     {
         if (GetFunc(func.Name!, true) != null)
             throw new Error($"Function '{func.Name}' is already exist", "Semantic", func.Position);
-        functions.Add(func.Name!, func);
+        functions.Add(func.Name, func);
     }
 
     public ClassSymbol? GetClass(string name, bool local)

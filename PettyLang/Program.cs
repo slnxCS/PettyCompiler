@@ -14,7 +14,7 @@ public class Program
     public static void Main(string[] args)
     {
 #if DEBUG
-    args = new string[] {"/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/code.pt"};
+    args = ["/home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/code.pt"];
 #endif
         if (args.Length < 1) 
             throw new ArgumentException("Excepted file name");

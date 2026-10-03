@@ -1,8 +1,13 @@
-class Vector : {
-    var X : int32 = 0;
-    var Y : int32 = 0;
+class test : {
+    var x = false;
+    func print_self() : {
+        print(x);
+    }
 }
 
 func Main() : {
-    
+    var instance1 = test();
+    instance1.print_self();
+    var instance2 = test();
+    instance2.print_self();
 }
