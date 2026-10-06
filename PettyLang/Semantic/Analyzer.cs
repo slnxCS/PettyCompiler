@@ -293,8 +293,10 @@ public class Analyzer
 
         for (int i = 0; i < ov.Arity; i++)
         {
-            currentScope.DefineVar(new(ov.Parameters[i].Name, ov.Parameters[i].Position, currentScope, ov.Parameters[i].Type, 
-                GetInstanceSymbol(ov.Parameters[i].Type, ov.Parameters[i].Position)));
+            var instance = GetInstanceSymbol(ov.Parameters[i].Type, ov.Parameters[i].Position);
+            var var = new VarSymbol(ov.Parameters[i].Name, ov.Parameters[i].Position, currentScope, ov.Parameters[i].Type, instance);
+            instance.Var = var;
+            currentScope.DefineVar(var);
         }
 
         try
