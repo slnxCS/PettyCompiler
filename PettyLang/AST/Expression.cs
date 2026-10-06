@@ -40,11 +40,15 @@ public class IdentifierExpressionPart(Position position, string id, Expression[]
     public FunctionOverload? ResolvedOverload = null;
     public FunctionParameter[]? ResolvedParameters = null;
     public IdentifierExpression Parent = null!;
+
+    public IdentifierExpressionPart? Last(int ID) => ID == 0 ? null : ID == 1 ? 
+        Parent.IsFirstIdentifier ? Parent.FirstPart as IdentifierExpressionPart: null : Parent.OtherParts[ID - 2];
 }
 
 public class IdentifierExpression : Expression
 {
     public readonly Expression FirstPart;
+    public Symbol? FirstPartResolved;
     public readonly bool IsFirstIdentifier;
     public Symbol Resolved = null!;
 

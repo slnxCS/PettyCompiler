@@ -1,13 +1,21 @@
-class test : {
-    var x = false;
+class Vector : {
+    var X = 0;
+    var Y = 0;
+
     func print_self() : {
-        print(x);
+        print(self.X);
+        print(self.Y);
     }
 }
 
 func Main() : {
-    var instance1 = test();
-    instance1.print_self();
-    var instance2 = test();
-    instance2.print_self();
+    var v2 = Vector();
+    var v1 = Vector();
+    v1.X = 1488;
+    v1.Y = 67;
+    v2.X = 52;
+    v2.Y = 42;
+
+    v1.print_self();
+    v2.print_self();
 }

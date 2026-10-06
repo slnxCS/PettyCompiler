@@ -14,6 +14,7 @@ public class Analyzer
     public Dictionary<ClassSymbol, List<FuncDefineStatement>> Methods = new();
     public List<ClassDefineStatement> Classes = new();
     private bool returnFinded;
+    public static Analyzer Current = null!;
 
     private void AddClassToList(ClassSymbol @class)
     {
@@ -35,6 +36,7 @@ public class Analyzer
 
     public Analyzer()
     {
+        Current = this;
         BuiltIn.Init();
         InitClassList();
     }
@@ -140,7 +142,7 @@ public class Analyzer
             if (!currentScope.Functions.Any(x => x.Value is ConstructorFunctionSymbol))
             {
                 var constructor = new ConstructorFunctionSymbol(sym, true);
-                constructor.AddOverload(new([], sym.Position, sym, null));
+                constructor.AddOverload(new([new("self", constructor.Position, sym)], sym.Position, sym, null));
                 BuiltIn.GlobalScope.DefineFunc(constructor);
                 
             }
@@ -223,14 +225,28 @@ public class Analyzer
 
     FunctionParameter[] ResolveParams(FuncParameter[] parameters)
     {
-        var @params = new FunctionParameter[parameters.Length];
-        for (int i = 0; i < @params.Length; i++)
-        {
-            @params[i] = new(parameters[i].Name, parameters[i].Position, GetSymType(ResolveExpression(parameters[i].Type)));
-            parameters[i].Resolved = @params[i];
-        }
+        if (currentClass == null) {
+            var @params = new FunctionParameter[parameters.Length];
+            for (int i = 0; i < @params.Length; i++)
+            {
+                @params[i] = new(parameters[i].Name, parameters[i].Position, GetSymType(ResolveExpression(parameters[i].Type)));
+                parameters[i].Resolved = @params[i];
+            }
 
-        return @params;
+            return @params;
+        }
+        else
+        {
+            var @params = new FunctionParameter[parameters.Length + 1];
+            @params[0] = new("self", currentClass.Position, currentClass);
+            for (int i = 1; i < @params.Length; i++)
+            {
+                @params[i] = new(parameters[i].Name, parameters[i].Position, GetSymType(ResolveExpression(parameters[i].Type)));
+                parameters[i].Resolved = @params[i];
+            }
+    
+            return @params;
+        }
     }
 
     FunctionOverload ResolveFuncDecl(FuncDefineStatement func)
@@ -242,7 +258,7 @@ public class Analyzer
             if (currentClass == null)
                 fs = new FunctionSymbol(func.Name, lastScope);
             else 
-                fs = new MethodSymbol(new VarSymbol("self", func.Position, currentScope, currentClass, new(currentScope, currentClass, func.Position)), func.Name);
+                fs = new MethodSymbol(func.Name, currentClass.Members);
             lastScope.DefineFunc(fs);
         }
 
@@ -308,6 +324,11 @@ public class Analyzer
 
     void VisitVarDef(VarDeclStatement varDecl)
     {
+        if (currentClass != null)
+        {
+            currentClass.VarDefines.Add(varDecl);
+            return;
+        }
         var resolved = ResolveExpression(varDecl.Value);
         var resolvedType = GetSymType(resolved);
         var type = varDecl.Type == null ? resolvedType : GetSymType(varDecl.Type);
@@ -320,9 +341,32 @@ public class Analyzer
             throw new Error($"cannot assign a value of type void to a variable", $"Semantic", varDecl.Value.Position);
         var value = GetInstanceSymbol(resolved);
         varDecl.Resolved = new(varDecl.Name, varDecl.Position, currentScope, type, value);
+        value.Var = varDecl.Resolved;
         currentScope.DefineVar(varDecl.Resolved);
         if (varDecl.Resolved.IsGlobal)
             GlobalVariables.Add(varDecl);
+    }
+
+    public VarSymbol[] ResolveFieldsDecl(List<VarDeclStatement> fields, ClassInstanceSymbol instance)
+    {
+        List<VarSymbol> vars = new();
+        foreach (var field in fields) {
+            var resolved = ResolveExpression(field.Value);
+            var resolvedType = GetSymType(resolved);
+            var type = field.Type == null ? resolvedType : GetSymType(field.Type);
+            if (field.Type != null)
+            {
+                if (type != resolvedType) 
+                    throw new Error($"Cannot convert from '{resolvedType.GetFullName()}' to '{type.GetFullName()}'", "Semantic", resolvedType.Position);
+            }
+            if (type == BuiltIn.VoidClass) 
+                throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value.Position);
+            var value = GetInstanceSymbol(resolved);
+            value.Var = new(field.Name, field.Position, instance.Members, type, value);;
+            vars.Add(value.Var);
+        }
+
+        return vars.ToArray();
     }
 
     void VisitStatementExpression(StatementExpression expr)
@@ -355,7 +399,10 @@ public class Analyzer
             case StringExpression : return BuiltIn.StringClass ?? 
                 throw new Error("To use the String type, import the String class from the std module (import String from std)", "Semantic", expr.Position);
             case IdentifierExpression id : return ResolveIdentifierExpression(id);
-            case IdentifierExpressionPart idPart : return ResolveIdentifierPart(idPart, currentScope, false, null);
+            case IdentifierExpressionPart idPart : {
+                idPart.Parent.FirstPartResolved = ResolveIdentifierPart(idPart, currentScope, false, null);
+                return idPart.Parent.FirstPartResolved;
+            }
             case BinaryExpression bin : return ResolveBin(bin);
             case AsExpression @as : return ResolveCastExpr(@as);
             default : throw new NotImplementedException($"{expr}");
@@ -389,7 +436,7 @@ public class Analyzer
         return GetInstanceSymbol(sym.ResolveCast(type, expression), expression.Position);
     }
 
-    ClassInstanceSymbol GetInstanceSymbol(ClassSymbol sym, Position position)
+    public ClassInstanceSymbol GetInstanceSymbol(ClassSymbol sym, Position position)
     {
         return sym.GetInstance(currentScope, position);
     }
@@ -453,17 +500,41 @@ public class Analyzer
         }
         else
         {
-            var sym = lookingScope.GetFunc(part.ID, local) ?? throw new Error(errorMsg, "Semantic", part.Position);
-            part.Resolved = sym;
-            //for (int i = 0; i < part.FuncCallsArguments.Length; i++)
-            //{
+            var func = lookingScope.GetFunc(part.ID, local);
+            if (func != null) {
                 var args = part.FuncCallsArguments[0];
                 var resolved = ResolveArgs(args);
-                var ov = sym.GetOverload(resolved, true, part.Position);
-                part.ResolvedOverload = ov;
-                part.ResolvedParameters = resolved;
-            //}
-            return GetInstanceSymbol(ov.ReturnType, part.Position);
+                if (func is not ConstructorFunctionSymbol constructor) {
+                    part.Resolved = func;
+                    //for (int i = 0; i < part.FuncCallsArguments.Length; i++)
+                    //{
+                        
+                        var ov = func.GetOverload(resolved, true, part.Position);
+                        part.ResolvedOverload = ov;
+                        part.ResolvedParameters = resolved;
+                    //}
+                    return GetInstanceSymbol(ov.ReturnType, part.Position);
+                }
+                else
+                {
+                    var res = constructor.ResolveCall(resolved, this, part);
+                    part.ResolvedOverload = res.Item2;
+                    part.ResolvedParameters = resolved;
+                    return res.Item1;
+                }
+            }
+            var var = lookingScope.GetVar(part.ID, local);
+            if (var != null)
+            {
+                return GetInstanceSymbol(var.ResolveCall(ResolveArgs(part.FuncCallsArguments[0]), part.Parent, part), part.Position);
+            }
+            var klass = lookingScope.GetClass(part.ID, local);
+            if (klass != null)
+            {
+                return GetInstanceSymbol(klass.ResolveCall(ResolveArgs(part.FuncCallsArguments[0]), part.Parent, part), part.Position);
+            }
+
+            throw new Error(errorMsg, "Semantic", part.Position);
         }
     }
 

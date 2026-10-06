@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Reflection;
 using System.Text;
 using PettyLang.AST;
@@ -40,6 +41,8 @@ public enum OpCode : byte
 
     ALLOCATE_OBJ = 25,
     CALL_METHOD = 30,
+    LOAD_FIELD = 31,
+    STORE_FIELD = 32,
 }
 
 public class Compiler
@@ -75,6 +78,11 @@ public class Compiler
         compiled.Add((byte)opCode);
     }
 
+    public void Emit(byte[] bytes)
+    {
+        compiled.AddRange(bytes);
+    }
+
     public int GlobalsLenght { get; private set; } = 0;
 
     void CompileVarDef(VarDeclStatement var)
@@ -93,10 +101,19 @@ public class Compiler
             throw new NotImplementedException();
 
         if (statement.Resolved == null)
-            throw new Error("The value is null. Stop the compiler", "Compiler", statement.Position);
+            throw new NullReferenceException();
 
         CompileExpression(statement.Value);
-        Emit(statement.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
+        if (statement.Resolved.DeclaredIn.Type == ScopeType.Instance)
+        {
+            Emit(statement.Resolved.GetOwnerPushBytes());
+            Emit(OpCode.STORE_FIELD);
+        }
+        else 
+        {
+            Emit(statement.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
+        }
+
         Emit(statement.Resolved.ID);
     }
 
@@ -158,9 +175,10 @@ public class Compiler
     void CompileIdentifierExpression(IdentifierExpression id)
     {
         CompileExpression(id.FirstPart);
-
-        foreach (var part in id.OtherParts)
-            CompileIdentifierExpressionPart(part);   
+        foreach (var part in id.OtherParts) 
+        {
+            CompileIdentifierExpressionPart(part);
+        }
     }
 
     void CompileReturn(ReturnStatement statement)
@@ -285,7 +303,7 @@ public class Compiler
             Emit(@class.Name);
             Emit(@class.Resolved.ID);
             Emit(@class.Resolved.Derived?.ID ?? -1);
-            Emit(@class.Resolved.Members.Variables.Count);
+            Emit(@class.Resolved.VarDefines.Count);
             if (analyzer.Methods.ContainsKey(@class.Resolved))
                 WriteFunctions(analyzer.Methods[@class.Resolved]);
             else Emit(0);

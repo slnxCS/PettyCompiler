@@ -19,7 +19,7 @@ public abstract class Symbol
     public int ID;
     public ClassSymbol Type;
     public virtual Scope? Members => null;
-    public readonly Scope DeclaredIn;
+    public Scope DeclaredIn;
     public readonly Position Position;
 
     public virtual void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler)
@@ -56,7 +56,15 @@ public abstract class Symbol
         throw new NotCallableError(GetFullName(), part.Position);
     }
     
-    public abstract byte[] GetPushBytes();
+    public virtual byte[] GetPushBytes()
+    {
+        throw new NotSupportedException($"Cannot push '{GetFullName()}'");
+    }
+
+    public virtual byte[] GetOwnerPushBytes()
+    {
+        throw new NotImplementedException();
+    }
 
     public virtual string GetFullName()
     {
@@ -68,7 +76,8 @@ public class VarSymbol : Symbol
 {
     public ClassInstanceSymbol Value;
 
-    public VarSymbol(string name, Position position, Scope declaredIn, ClassSymbol type, ClassInstanceSymbol value) : base(name, declaredIn.GetFreeVarID(), type, declaredIn, position)
+    public VarSymbol(string name, Position position, Scope declaredIn, ClassSymbol type, ClassInstanceSymbol value) : 
+        base(name, declaredIn.GetFreeVarID(), type, declaredIn, position)
     {
         Value = value;
     }
@@ -82,7 +91,25 @@ public class VarSymbol : Symbol
 
     public override byte[] GetPushBytes()
     {
-        return [(byte)(IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL), .. BitConverter.GetBytes(ID)];
+        if (DeclaredIn.Self == null) {
+            return [(byte)(IsGlobal ? OpCode.LOAD_GLOBAL : OpCode.LOAD_LOCAL), .. BitConverter.GetBytes(ID)];
+        }
+        else
+        {
+            var owner = DeclaredIn.Self;
+            return [.. owner.GetPushBytes(), 
+                (byte)OpCode.LOAD_FIELD, .. BitConverter.GetBytes(ID)];
+        }
+    }
+
+    public override byte[] GetOwnerPushBytes()
+    {
+        if (DeclaredIn.Self != null)
+        {
+            var owner = DeclaredIn.Self;
+            return [.. owner.GetPushBytes()];
+        }
+        else throw new NotImplementedException();
     }
 
     public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler)
@@ -106,13 +133,25 @@ public class VarSymbol : Symbol
     {
         Value.CompileCastBytes(castType, expression, compiler);
     }
+
+    public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        return Value.GetBytesForCall(arguments, id, part);
+    }
+
+    public override ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        return Value.ResolveCall(arguments, id, part);
+    }
 }
 
 public class ClassInstanceSymbol : Symbol
 {
+    public VarSymbol? Var;
+
     public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position) : base(@class.GetFullName(), null, @class, declaredIn, position)
     {
-        selfScope = new(ScopeType.Instance, DeclaredIn);
+        selfScope = new(ScopeType.Instance, DeclaredIn, this);
         selfScope.CopyFromClass(@class);
     }
 
@@ -121,7 +160,8 @@ public class ClassInstanceSymbol : Symbol
 
     public override byte[] GetPushBytes()
     {
-        throw new NotSupportedException();
+        if (Var != null) return Var.GetPushBytes();
+        else return [];
     }
 }
 
@@ -176,7 +216,8 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
 
     public override byte[] GetPushBytes()
     {
-        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new FloatConstant(Value ?? throw new NullReferenceException("Value"))))];
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new FloatConstant(Value 
+            ?? throw new NullReferenceException("Value"))))];
     }
 
     public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
@@ -210,7 +251,8 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
 
     public override byte[] GetPushBytes()
     {
-        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value ?? throw new NullReferenceException("Value"))))];
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value 
+            ?? throw new NullReferenceException("Value"))))];
     }
 
     public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
@@ -273,17 +315,13 @@ public class ClassSymbol : Symbol
     protected Scope ClassScope;
     public ClassSymbol? Derived;
     public override Scope Members => ClassScope;
+    public readonly List<VarDeclStatement> VarDefines = new();
 
     public ClassSymbol(string name, Scope declaredIn, Position position, ClassSymbol? derived) : 
         base(name, BuiltIn.GlobalScope.GetFreeClassID(), null, declaredIn, position)
     {
         ClassScope = new(ScopeType.Class, declaredIn);
         Derived = derived;
-    }
-
-    public override byte[] GetPushBytes()
-    {
-        return [];
     }
 
     public virtual ClassInstanceSymbol GetInstance(Scope scope, Position position)
@@ -341,7 +379,7 @@ public class BoolClassSymbol : ClassSymbol
     }
 }
 
-public class ConstructorFunctionSymbol : FunctionSymbol
+public class ConstructorFunctionSymbol : MethodSymbol
 {
     public readonly bool IsAutoGenerated;
     public readonly ClassSymbol Class;
@@ -351,10 +389,11 @@ public class ConstructorFunctionSymbol : FunctionSymbol
         IsAutoGenerated = isAutoGenerated;
     }
 
-    public override ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    public new (ClassInstanceSymbol, FunctionOverload) ResolveCall(FunctionParameter[] arguments, Analyzer analyzer, IdentifierExpressionPart part)
     {
-        GetOverload(arguments, true, part.Position);
-        return Class;
+        var instance = analyzer.GetInstanceSymbol(Class, Position);
+        var overload = GetOverload([new("self", instance.Position, instance.Type) ,.. arguments], true, part.Position);
+        return (instance, overload);
     }
 
     public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
@@ -368,11 +407,8 @@ public class ConstructorFunctionSymbol : FunctionSymbol
 
 public class MethodSymbol : FunctionSymbol
 {
-    public readonly VarSymbol Instance;
-
-    public MethodSymbol(VarSymbol instance, string name) : base(name, instance.Members!)
+    public MethodSymbol(string name, Scope declaredIn) : base(name, declaredIn)
     {
-        Instance = instance;
     }
 
     public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
@@ -382,7 +418,23 @@ public class MethodSymbol : FunctionSymbol
 
         var ov = part.ResolvedOverload;
 
-        return [.. Instance.GetPushBytes(), (byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
+        return [.. DeclaredIn.Self!.GetPushBytes(), (byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
+    }
+
+    public override ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {
+        if (DeclaredIn.Self != null)
+            return base.ResolveCall([new("self", DeclaredIn.Self!.Type.Position, DeclaredIn.Self.Type) ,.. arguments], id, part);
+        else 
+            return base.ResolveCall(arguments, id, part);
+    }
+
+    public override FunctionOverload GetOverload(FunctionParameter[] parameters, bool throws, Position position = default)
+    {
+        if (DeclaredIn.Self != null)
+            return base.GetOverload([new("self", DeclaredIn.Self.Type.Position, DeclaredIn.Self.Type) ,.. parameters], throws, position);
+        else 
+            return base.GetOverload(parameters, throws, position);
     }
 }
 
@@ -411,15 +463,15 @@ public class FunctionSymbol : ClassInstanceSymbol
         Name = name;
     }
 
-    protected readonly List<FunctionOverload> Overloads = new();
+    public readonly List<FunctionOverload> Overloads = new();
 
-    public FunctionOverload GetOverload(FunctionParameter[] parameters, bool throws, Position position = default)
+    public virtual FunctionOverload GetOverload(FunctionParameter[] parameters, bool throws, Position position = default)
     {
         if (!ContainsOverload(parameters, out var ov))
         {
             if (throws)
                 throw new Error(
-                    $"Function with name '{Name}' does not contains overloads with same parameters({new string(string.Join(',', parameters).Skip(1).ToArray())})", "Semantic",
+                    $"Function with name '{Name}' does not contains overloads with same parameters({new string(string.Join(',', parameters).ToArray())})", "Semantic",
                         position);
             else return null!;
         }

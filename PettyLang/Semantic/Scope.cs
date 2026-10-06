@@ -1,4 +1,3 @@
-using System.Security.Cryptography.X509Certificates;
 using PettyLang.Errors;
 
 namespace PettyLang.Semantic;
@@ -10,10 +9,13 @@ public enum ScopeType
 
 public class Scope
 {
-    public Scope(ScopeType type, Scope? parent)
+    public Scope(ScopeType type, Scope? parent, ClassInstanceSymbol? self = null)
     {
         Parent = parent;
         Type = type;
+        Self = self;
+        if (Type == ScopeType.Instance && Self == null)
+            throw new ArgumentNullException("self");
 
         freeIDSet = Type switch
         {
@@ -26,6 +28,7 @@ public class Scope
 
     public readonly Scope? Parent;
     public readonly ScopeType Type;
+    public readonly ClassInstanceSymbol? Self;
 
     private Dictionary<string, VarSymbol> variables = new();
     public IReadOnlyDictionary<string, VarSymbol> Variables => variables;
@@ -63,14 +66,26 @@ public class Scope
 
     public void CopyFromClass(ClassSymbol @class)
     {
-        if (Type != ScopeType.Instance) 
+        if (Type != ScopeType.Instance || Self == null) 
             throw new InvalidOperationException();
 
         var classScope = @class.Members;
 
-        variables = new(classScope.variables);
-        functions = new(classScope.functions);
+        foreach (var classFunction in classScope.Functions.Values)
+        {
+            var method = new MethodSymbol(classFunction.Name, this);
+            foreach (var overload in classFunction.Overloads)
+            {
+                method.AddOverload(overload);
+            }
+            DefineFunc(method);
+        }
         classes = new(classScope.classes);
+
+        foreach (var var in Analyzer.Current.ResolveFieldsDecl(@class.VarDefines, Self))
+        {
+            DefineVar(var);
+        }
     }
 
     public VarSymbol? GetVar(string name, bool local)
