@@ -106,7 +106,7 @@ public class Compiler
         CompileExpression(statement.Value);
         if (statement.Resolved.DeclaredIn.Type == ScopeType.Instance)
         {
-            Emit(statement.Resolved.GetOwnerPushBytes());
+            CompileIdentifierExpressionWithoutLast(statement.Target);
             Emit(OpCode.STORE_FIELD);
         }
         else 
@@ -122,15 +122,15 @@ public class Compiler
         switch (ex)
         {
             case IntExpression _int : 
-                compiled.AddRange(_int.Resolved.GetPushBytes());
+                compiled.AddRange(_int.Resolved.GetPushBytes(null));
             break;
 
             case FloatExpression _float : 
-                compiled.AddRange(_float.Resolved.GetPushBytes());
+                compiled.AddRange(_float.Resolved.GetPushBytes(null));
             break;
 
             case BoolExpression _bool : 
-                compiled.AddRange(_bool.Resolved.GetPushBytes());
+                compiled.AddRange(_bool.Resolved.GetPushBytes(null));
             break;
 
             case IdentifierExpression id : 
@@ -169,7 +169,7 @@ public class Compiler
 
         var sym = part.Resolved;
 
-        compiled.AddRange(sym.GetPushBytes());
+        compiled.AddRange(sym.GetPushBytes(part));
     }
 
     void CompileIdentifierExpression(IdentifierExpression id)
@@ -178,6 +178,18 @@ public class Compiler
         foreach (var part in id.OtherParts) 
         {
             CompileIdentifierExpressionPart(part);
+        }
+    }
+
+    void CompileIdentifierExpressionWithoutLast(IdentifierExpression id)
+    {
+        if (id.OtherParts.Length == 0) return;
+
+        CompileExpression(id.FirstPart);
+
+        for (int i = 0; i < id.OtherParts.Length - 1; i++)
+        {
+            CompileExpression(id.OtherParts[i]);
         }
     }
 

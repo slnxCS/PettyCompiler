@@ -30,6 +30,9 @@ public class StringExpression(string str, Position position) : Expression(positi
 public class IdentifierExpressionPart(Position position, string id, Expression[][] funcCallArguments, 
     Expression[]? arrayAppealArgumentsBeforeFuncCall, Expression[]? arrayAppealArgumentsAftersFuncCall) : Expression(position)
 {
+    public byte[] SelfPushBytes => Resolved.GetPushBytes(this);
+    public int Index;
+
     public readonly string ID = id;
     public readonly Expression[][] FuncCallsArguments = funcCallArguments;
 
@@ -41,15 +44,15 @@ public class IdentifierExpressionPart(Position position, string id, Expression[]
     public FunctionParameter[]? ResolvedParameters = null;
     public IdentifierExpression Parent = null!;
 
-    public IdentifierExpressionPart? Last(int ID) => ID == 0 ? null : ID == 1 ? 
-        Parent.IsFirstIdentifier ? Parent.FirstPart as IdentifierExpressionPart: null : Parent.OtherParts[ID - 2];
+    public IdentifierExpressionPart? Last() => Index == 0 ? null : Index == 1 ? 
+        Parent.IsFirstIdentifier ? Parent.FirstPart as IdentifierExpressionPart: null : Parent.OtherParts[Index - 2];
 }
 
 public class IdentifierExpression : Expression
 {
     public readonly Expression FirstPart;
     public Symbol? FirstPartResolved;
-    public readonly bool IsFirstIdentifier;
+    public readonly bool IsFirstIdentifier = false;
     public Symbol Resolved = null!;
 
     public readonly IdentifierExpressionPart[] OtherParts;
@@ -60,11 +63,19 @@ public class IdentifierExpression : Expression
     {
         FirstPart = firstPart;
         OtherParts = otherParts;
-        IsFirstIdentifier = firstPart is IdentifierExpressionPart;
-        if (FirstPart is IdentifierExpressionPart _firstPart)
+        if (FirstPart is IdentifierExpressionPart _firstPart) 
+        {
             _firstPart.Parent = this;
-        foreach (var part in OtherParts) 
+            IsFirstIdentifier = true;
+            _firstPart.Index = 0;
+        }
+        else if (FirstPart is IdentifierExpression) throw new Exception("какого хрена вообще?!?");
+        for (int i = 0; i < otherParts.Length; i++) 
+        {
+            var part = otherParts[i];
+            part.Index = i + 1;
             part.Parent = this;
+        }
     }
 }
 

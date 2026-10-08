@@ -1,27 +1,21 @@
 class Vector : {
     var X = 0;
     var Y = 0;
+
+    func print_self() : {
+        print(self.X);
+        print(self.Y);
+    }
 }
 
-func eq_obj(v : Vector) : {
-    v = Vector();
-    v.X = 10;
-}
-
-func print(v : Vector) : {
-    print(v.X);
-    print(v.Y);
+func get_vector() : Vector {
+    var v = Vector();
+    v.X = read();
+    v.Y = read();
+    return v;
 }
 
 func Main() : {
-    var v2 = Vector();
-    var v1 = Vector();
-    v1.X = 0;
-    v1.Y = 1;
-    v2.X = 2;
-    v2.Y = 3;
-
-    eq_obj(v1);
-    print(v1);
-    print(v2);
+    var x = get_vector();
+    x.print_self();
 }

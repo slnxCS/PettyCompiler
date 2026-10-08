@@ -295,7 +295,6 @@ public class Analyzer
         {
             var instance = GetInstanceSymbol(ov.Parameters[i].Type, ov.Parameters[i].Position);
             var var = new VarSymbol(ov.Parameters[i].Name, ov.Parameters[i].Position, currentScope, ov.Parameters[i].Type, instance);
-            instance.Var = var;
             currentScope.DefineVar(var);
         }
 
@@ -343,7 +342,6 @@ public class Analyzer
             throw new Error($"cannot assign a value of type void to a variable", $"Semantic", varDecl.Value.Position);
         var value = GetInstanceSymbol(resolved);
         varDecl.Resolved = new(varDecl.Name, varDecl.Position, currentScope, type, value);
-        value.Var = varDecl.Resolved;
         currentScope.DefineVar(varDecl.Resolved);
         if (varDecl.Resolved.IsGlobal)
             GlobalVariables.Add(varDecl);
@@ -364,8 +362,7 @@ public class Analyzer
             if (type == BuiltIn.VoidClass) 
                 throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value.Position);
             var value = GetInstanceSymbol(resolved);
-            value.Var = new(field.Name, field.Position, instance.Members, type, value);;
-            vars.Add(value.Var);
+            vars.Add(new(field.Name, field.Position, instance.Members, type, value));
         }
 
         return vars.ToArray();
@@ -515,13 +512,15 @@ public class Analyzer
                         part.ResolvedOverload = ov;
                         part.ResolvedParameters = resolved;
                     //}
-                    return GetInstanceSymbol(ov.ReturnType, part.Position);
+                    part.Resolved = GetInstanceSymbol(ov.ReturnType, part.Position);
+                    return part.Resolved;
                 }
                 else
                 {
                     var res = constructor.ResolveCall(resolved, this, part);
                     part.ResolvedOverload = res.Item2;
                     part.ResolvedParameters = resolved;
+                    part.Resolved = res.Item1;
                     return res.Item1;
                 }
             }
@@ -542,12 +541,11 @@ public class Analyzer
 
     Symbol ResolveIdentifierExpression(IdentifierExpression identifier)
     {
-        Scope lookingScope;
         Symbol sym = ResolveExpression(identifier.FirstPart);
 
         for (int i = 0; i < identifier.OtherParts.Length; i++)
         {
-            lookingScope = sym.Members ?? throw new Exception($"Cannot use operator '.' to '{sym.GetFullName()}'");;
+            Scope lookingScope = sym.Members ?? throw new Exception($"Cannot use operator '.' to '{sym.GetFullName()}'");;
             var part = identifier.OtherParts[i];
             sym = ResolveIdentifierPart(part, lookingScope, true, sym);
         }

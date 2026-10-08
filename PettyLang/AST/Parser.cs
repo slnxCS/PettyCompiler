@@ -207,7 +207,7 @@ public class Parser
     private IdentifierExpression parseIdentifier()
     {
         var startPos = current.Position.Start;
-        var firstExpr = parseExpression();
+        var firstExpr = parseIdentifierPart();
         var otherParts = new List<IdentifierExpressionPart>();
 
         while (match(TokenType.Dot)) otherParts.Add(parseIdentifierPart());
@@ -311,10 +311,10 @@ public class Parser
     private Expression parseAfterIdentifierExpression()
     {
         var ex = parsePrimaryBasicExpression();
-        if (current.Type == TokenType.Dot)
-            return parseIdentifier(ex);
-
-        if (ex is IdentifierExpressionPart idPart) ex = new IdentifierExpression(idPart.Position, idPart, []);
+        //if (current.Type == TokenType.Dot)
+        //    return parseIdentifier(ex);
+//
+        //if (ex is IdentifierExpressionPart idPart) ex = new IdentifierExpression(idPart.Position, idPart, []);
 
         return ex;
     }
@@ -355,7 +355,7 @@ public class Parser
 
             case TokenType.Identifier :
             {
-                return parseIdentifierPart();
+                return parseIdentifier();
             }
 
             case TokenType.LParen :
