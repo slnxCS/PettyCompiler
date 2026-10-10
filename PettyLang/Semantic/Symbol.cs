@@ -96,9 +96,7 @@ public class VarSymbol : Symbol
         }
         else
         {
-            var owner = DeclaredIn.Self;
-            return [.. idPart?.Last()?.SelfPushBytes ?? [], 
-                (byte)OpCode.LOAD_FIELD, .. BitConverter.GetBytes(ID)];
+            return [(byte)OpCode.LOAD_FIELD, .. BitConverter.GetBytes(ID)];
         }
     }
 
@@ -420,7 +418,7 @@ public class MethodSymbol : FunctionSymbol
         var owner = part.Last();
         if (owner == null)
             throw new NullReferenceException(nameof(owner));
-        return [.. owner.SelfPushBytes,(byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
+        return [(byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
     }
 
     public override ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)

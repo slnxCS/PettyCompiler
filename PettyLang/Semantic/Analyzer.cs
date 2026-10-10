@@ -133,19 +133,21 @@ public class Analyzer
         currentClass = sym;
         Classes.Add(@class);
 
+        if (!currentScope.Functions.Any(x => x.Value is ConstructorFunctionSymbol))
+        {
+            var constructor = new ConstructorFunctionSymbol(sym, true);
+            constructor.AddOverload(new([new("self", constructor.Position, sym)], sym.Position, sym, null));
+            BuiltIn.GlobalScope.DefineFunc(constructor);
+            
+        }
+
         try
         {
             if (@class.Block != null) VisitStatements(@class.Block.Statements);
         }
         finally
         {
-            if (!currentScope.Functions.Any(x => x.Value is ConstructorFunctionSymbol))
-            {
-                var constructor = new ConstructorFunctionSymbol(sym, true);
-                constructor.AddOverload(new([new("self", constructor.Position, sym)], sym.Position, sym, null));
-                BuiltIn.GlobalScope.DefineFunc(constructor);
-                
-            }
+            
             currentScope = oldScope;
             currentClass = oldClass;
         }
@@ -241,8 +243,9 @@ public class Analyzer
             @params[0] = new("self", currentClass.Position, currentClass);
             for (int i = 1; i < @params.Length; i++)
             {
-                @params[i] = new(parameters[i].Name, parameters[i].Position, GetSymType(ResolveExpression(parameters[i].Type)));
-                parameters[i].Resolved = @params[i];
+                var j = i - 1;
+                @params[i] = new(parameters[j].Name, parameters[j].Position, GetSymType(ResolveExpression(parameters[j].Type)));
+                parameters[j].Resolved = @params[i];
             }
     
             return @params;
@@ -325,13 +328,27 @@ public class Analyzer
 
     void VisitVarDef(VarDeclStatement varDecl)
     {
-        if (currentClass != null)
+        if (currentClass != null && currentFunction == null)
         {
             currentClass.VarDefines.Add(varDecl);
             return;
         }
-        var resolved = ResolveExpression(varDecl.Value);
-        var resolvedType = GetSymType(resolved);
+
+        Symbol resolved;
+        ClassSymbol resolvedType;
+
+        if (varDecl.Value != null) 
+        {
+            resolved = ResolveExpression(varDecl.Value);
+            resolvedType = GetSymType(resolved);
+        }
+        else
+        {
+            resolvedType = GetSymType(ResolveIdentifierExpression(varDecl.Type!));
+            resolved = resolvedType.GetInstance(resolvedType.Members, resolvedType.Position);
+        }
+
+
         var type = varDecl.Type == null ? resolvedType : GetSymType(varDecl.Type);
         if (varDecl.Type != null)
         {
@@ -351,8 +368,18 @@ public class Analyzer
     {
         List<VarSymbol> vars = new();
         foreach (var field in fields) {
-            var resolved = ResolveExpression(field.Value);
-            var resolvedType = GetSymType(resolved);
+            Symbol resolved;
+            ClassSymbol resolvedType;
+            if (field.Value != null) 
+            {
+                resolved = ResolveExpression(field.Value);
+                resolvedType = GetSymType(resolved);
+            }
+            else
+            {
+                resolvedType = GetSymType(ResolveIdentifierExpression(field.Type!));
+                resolved = resolvedType.GetInstance(instance.Members, instance.Position);
+            }
             var type = field.Type == null ? resolvedType : GetSymType(field.Type);
             if (field.Type != null)
             {

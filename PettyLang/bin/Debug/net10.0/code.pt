@@ -1,21 +1,33 @@
 class Vector : {
-    var X = 0;
-    var Y = 0;
+    var X : int32;
+    var Y : int32;
 
     func print_self() : {
         print(self.X);
         print(self.Y);
     }
-}
 
-func get_vector() : Vector {
-    var v = Vector();
-    v.X = read();
-    v.Y = read();
-    return v;
+    func Init() : {
+        self.X = read();
+        self.Y = read();
+    }
+
+    func Plus(right : Vector) : Vector {
+        var res = Vector();
+
+        res.X = self.X + right.X;
+        res.Y = self.Y + right.Y;
+
+        return res;
+    }
 }
 
 func Main() : {
-    var x = get_vector();
-    x.print_self();
+    var vec1 = Vector();
+    var vec2 = Vector();
+
+    vec1.Init();
+    vec2.Init();
+
+    vec1.Plus(vec2).print_self();
 }

@@ -240,9 +240,21 @@ public class Parser
         var name = consume(TokenType.Identifier, "Expected variable name").Lexeme;
         IdentifierExpression? type = null;
 
-        if (match(TokenType.Colon)) type = parseIdentifier();
-        
-        consume(TokenType.Equate, "Expected '=' before variable value");
+        if (match(TokenType.Semicolon))
+        {
+            throw new Error("Expected variable type or value", "parser", last.Position);
+        }
+
+        if (match(TokenType.Colon)) {
+            type = parseIdentifier();
+            if (match(TokenType.Semicolon, false))
+            {
+                var _endPos = current.Position.End;
+                advance();
+                return new(new(startPos, _endPos), name, type, null);
+            }
+        }
+        consume(TokenType.Equate, $"Expected '=' after variable {(type == null ? "name" : "type")}");
 
         var value = parseExpression();
         var endPos = consume(TokenType.Semicolon, "Expected ';' after variable assign").Position.End;

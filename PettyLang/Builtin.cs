@@ -72,6 +72,13 @@ public static class BuiltIn {
                     new([], Int32Class, 3)
                 ]
             ),
+
+            new(
+                "random",
+                [
+                    new([new("min", default, Int32Class), new("max", default, Int32Class)], Int32Class, 4),
+                ]
+            ),
         ];
 
         Define();

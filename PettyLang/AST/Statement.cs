@@ -9,10 +9,10 @@ public class StatementExpression(Expression expr) : Statement(expr.Position)
     public readonly Expression Expression = expr;
 }
 
-public class VarDeclStatement(Position position, string name, IdentifierExpression? type, Expression value) : Statement(position)
+public class VarDeclStatement(Position position, string name, IdentifierExpression? type, Expression? value) : Statement(position)
 {
     public readonly string Name = name;
-    public readonly Expression Value = value;
+    public readonly Expression? Value = value;
     public readonly IdentifierExpression? Type = type;
     public VarSymbol Resolved = null!;
 }
