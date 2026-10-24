@@ -11,7 +11,7 @@ public class Analyzer
     public static FunctionOverload? MainFunction;
     public List<VarDeclStatement> GlobalVariables = new();
     public List<FuncDefineStatement> Functions = new();
-    public Dictionary<ClassSymbol, List<FuncDefineStatement>> Methods = new();
+    public Dictionary<ClassSymbol, List<FunctionOverload>> Methods = new();
     public List<ClassDefineStatement> Classes = new();
     private bool returnFinded;
     public static Analyzer Current = null!;
@@ -133,17 +133,18 @@ public class Analyzer
         currentClass = sym;
         Classes.Add(@class);
 
-        if (!currentScope.Functions.Any(x => x.Value is ConstructorFunctionSymbol))
-        {
-            var constructor = new ConstructorFunctionSymbol(sym, true);
-            constructor.AddOverload(new([new("self", constructor.Position, sym)], sym.Position, sym, null));
-            BuiltIn.GlobalScope.DefineFunc(constructor);
-            
-        }
-
         try
         {
-            if (@class.Block != null) VisitStatements(@class.Block.Statements);
+            if (@class.Block != null) 
+            {
+                var vars = DefineAll<VarDeclStatement>(@class.Block.Statements, VisitVarDef);
+                var funcs = DefineAll<FuncDefineStatement>(@class.Block.Statements, VisitFuncDeclWithoutBlock);
+
+                foreach (var func in funcs)
+                {
+                    VisitFuncBlock(func.Resolved!);
+                }
+            }
         }
         finally
         {
@@ -252,21 +253,19 @@ public class Analyzer
         }
     }
 
-    FunctionOverload ResolveFuncDecl(FuncDefineStatement func)
+    void VisitFuncDeclWithoutBlock(FuncDefineStatement func)
     {
-        var lastScope = currentScope;
-        currentScope = new Scope(ScopeType.Function, currentScope);
-        var fs = lastScope.GetFunc(func.Name, false);
+        var fs = currentScope.GetFunc(func.Name, false);
         if (fs == null) {
             if (currentClass == null)
-                fs = new FunctionSymbol(func.Name, lastScope);
+                fs = new FunctionSymbol(func.Name, currentScope);
             else 
                 fs = new MethodSymbol(func.Name, currentClass.Members);
-            lastScope.DefineFunc(fs);
+            currentScope.DefineFunc(fs);
         }
 
         var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null? BuiltIn.VoidClass : 
-                GetSymType(ResolveExpression(func.ReturnType)), func);
+                GetSymType(ResolveExpression(func.ReturnType)), func, null);
 
         func.Resolved = ov;
 
@@ -274,6 +273,60 @@ public class Analyzer
 
         if (fs.Name == "Main")
         {
+            if (currentClass != null)
+            {
+                throw new Error("Main entry point should be function, not method", "Semantic", ov.Position);
+            }
+            if (MainFunction != null) 
+            {
+                throw new Error("Main entry point is already exist in this program", "Semantic", ov.Position);
+            }
+            if (ov.ReturnType != BuiltIn.VoidClass)
+            {
+                throw new Error("Main function must return void", "Semantic", ov.Position);
+            }
+            if (ov.Arity != 0)
+            {
+                throw new Error("Main function should not take any parameters", "Semantic", ov.Position);
+            }
+
+            MainFunction = ov;
+        }
+        
+        if (currentClass == null)
+            Functions.Add(func);
+        else 
+        {
+            if (!Methods.ContainsKey(currentClass))
+                Methods.Add(currentClass, new());
+            Methods[currentClass].Add(ov);
+        }
+    }
+
+    FunctionOverload ResolveFuncDecl(FuncDefineStatement func)
+    {
+        var fs = currentScope.GetFunc(func.Name, false);
+        if (fs == null) {
+            if (currentClass == null)
+                fs = new FunctionSymbol(func.Name, currentScope);
+            else 
+                fs = new MethodSymbol(func.Name, currentClass.Members);
+            currentScope.DefineFunc(fs);
+        }
+
+        var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null ? BuiltIn.VoidClass : 
+                GetSymType(ResolveExpression(func.ReturnType)), func, null);
+
+        func.Resolved = ov;
+
+        fs.AddOverload(ov);
+
+        if (fs.Name == "Main")
+        {
+            if (currentClass != null)
+            {
+                throw new Error("Main entry point should be function, not method", "Semantic", ov.Position);
+            }
             if (MainFunction != null) 
             {
                 throw new Error("Main entry point is already exist in this program", "Semantic", ov.Position);
@@ -290,6 +343,24 @@ public class Analyzer
             MainFunction = ov;
         }
 
+        VisitFuncBlock(ov);
+
+        if (currentClass == null)
+            Functions.Add(func);
+        else 
+        {
+            if (!Methods.ContainsKey(currentClass))
+                Methods.Add(currentClass, new());
+            Methods[currentClass].Add(ov);
+        }
+
+        return ov;
+    }
+
+    void VisitFuncBlock(FunctionOverload ov)
+    {
+        var lastScope = currentScope;
+        currentScope = new Scope(ScopeType.Function, currentScope);
         var oldFunc = currentFunction;
         currentFunction = ov;
         returnFinded = false;
@@ -312,18 +383,8 @@ public class Analyzer
             currentScope = lastScope;
             currentFunction = oldFunc;
             if (!returnFinded && ov.ReturnType != BuiltIn.VoidClass) 
-                throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", func.Position);
+                throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", ov.Position);
         }
-        if (currentClass == null)
-            Functions.Add(func);
-        else 
-        {
-            if (!Methods.ContainsKey(currentClass))
-                Methods.Add(currentClass, new());
-            Methods[currentClass].Add(func);
-        }
-
-        return ov;
     }
 
     void VisitVarDef(VarDeclStatement varDecl)
@@ -387,9 +448,10 @@ public class Analyzer
                     throw new Error($"Cannot convert from '{resolvedType.GetFullName()}' to '{type.GetFullName()}'", "Semantic", resolvedType.Position);
             }
             if (type == BuiltIn.VoidClass) 
-                throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value.Position);
+                throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value?.Position ?? resolved.Position);
             var value = GetInstanceSymbol(resolved);
-            vars.Add(new(field.Name, field.Position, instance.Members, type, value));
+            field.Resolved = new(field.Name, field.Position, instance.Members, type, value);
+            vars.Add(field.Resolved);
         }
 
         return vars.ToArray();
@@ -435,6 +497,40 @@ public class Analyzer
         }
     }
 
+    T[] DefineAll<T, TFuncResult>(Statement[] statements, Func<T, TFuncResult> defAction)
+        where T : Statement
+    {
+        List<T> TStatements = [];
+
+        foreach (var statement in statements)
+        {
+            if (statement is T TStatement)
+            {
+                TStatements.Add(TStatement);
+                defAction(TStatement);
+            }
+        }
+
+        return TStatements.ToArray();
+    }
+
+    T[] DefineAll<T>(Statement[] statements, Action<T> defAction)
+        where T : Statement
+    {
+        List<T> TStatements = [];
+
+        foreach (var statement in statements)
+        {
+            if (statement is T TStatement)
+            {
+                TStatements.Add(TStatement);
+                defAction(TStatement);
+            }
+        }
+
+        return TStatements.ToArray();
+    }
+
     ClassInstanceSymbol GetInstanceSymbol(Symbol sym)
     {
         if (sym is ClassInstanceSymbol instance)
@@ -449,7 +545,7 @@ public class Analyzer
     {
         var s = ResolveExpression(expr);
         if (s is not ClassSymbol cl)
-            throw new Error("Expected class", "Semantic", expr.Position);
+            throw new Error($"Expected type, but its {s.GetFullName()}", "Semantic", expr.Position);
         return cl;
     }
 
@@ -527,9 +623,9 @@ public class Analyzer
         else
         {
             var func = lookingScope.GetFunc(part.ID, local);
+            var args = part.FuncCallsArguments[0];
+            var resolved = ResolveArgs(args);
             if (func != null) {
-                var args = part.FuncCallsArguments[0];
-                var resolved = ResolveArgs(args);
                 if (func is not ConstructorFunctionSymbol constructor) {
                     part.Resolved = func;
                     //for (int i = 0; i < part.FuncCallsArguments.Length; i++)
@@ -554,12 +650,16 @@ public class Analyzer
             var var = lookingScope.GetVar(part.ID, local);
             if (var != null)
             {
-                return GetInstanceSymbol(var.ResolveCall(ResolveArgs(part.FuncCallsArguments[0]), part.Parent, part), part.Position);
+                return GetInstanceSymbol(var.ResolveCall(resolved, part.Parent, part), part.Position);
             }
             var klass = lookingScope.GetClass(part.ID, local);
             if (klass != null)
             {
-                return GetInstanceSymbol(klass.ResolveCall(ResolveArgs(part.FuncCallsArguments[0]), part.Parent, part), part.Position);
+                var res = klass.ResolveCall(resolved, this, part);
+                part.ResolvedOverload = res.Item2;
+                part.ResolvedParameters = resolved;
+                part.Resolved = res.Item1;
+                return res.Item1;
             }
 
             throw new Error(errorMsg, "Semantic", part.Position);

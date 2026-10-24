@@ -269,6 +269,11 @@ public class Compiler
         Emit(OpCode.HALT);
     }
 
+    private void SortFunctionsByID(List<FunctionOverload> functions)
+    {
+        functions = [.. functions.OrderBy(x => x.ID)];
+    }
+
     private void SortFunctionsByID(List<FuncDefineStatement> functions)
     {
         functions = functions.OrderBy(x => x.Resolved?.ID 
@@ -281,6 +286,26 @@ public class Compiler
             ?? throw new Error($"Class '{x.Name}' is not resolved", "compiler", x.Position)).ToList();
     }
 
+
+    private void WriteFunctions(List<FunctionOverload> functions) {
+        Emit(functions.Count);
+
+        SortFunctionsByID(functions);
+
+        for (int i = 0; i < functions.Count; i++)
+        {
+            var func = functions[i];
+            Emit(OpCode.RESERVE_LOCALS);
+            Emit(func.LocalsCount);
+            if (func.Statement != null)
+                CompileStatements(func.Statement.Block.Statements);
+            else 
+                func.EmitBytes!(this);
+            Emit(OpCode.RET);
+            Emit(OpCode.HALT);
+        }
+
+    }
 
     private void WriteFunctions(List<FuncDefineStatement> functions) {
         Emit(functions.Count);
