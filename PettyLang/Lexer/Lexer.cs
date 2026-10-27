@@ -49,7 +49,7 @@ public class Lexer(string source)
         {"+", TokenType.Plus},
         {"-", TokenType.Minus},
         {"/", TokenType.Slash},
-        {"*", TokenType.Asteric},
+        {"*", TokenType.Asterisk},
         {"=", TokenType.Equate},
         {"==", TokenType.Equals},
         {"+=", TokenType.PlusEquate},

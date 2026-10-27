@@ -17,7 +17,7 @@ public class VarDeclStatement(Position position, string name, IdentifierExpressi
     public VarSymbol Resolved = null!;
 }
 
-public class VarAssigmentStatement(Position position, IdentifierExpression target, string @operator, Expression value) : Statement(position)
+public class VarAssignmentStatement(Position position, IdentifierExpression target, string @operator, Expression value) : Statement(position)
 {
     public readonly IdentifierExpression Target = target;
     public readonly string Operator = @operator;

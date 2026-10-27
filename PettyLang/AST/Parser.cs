@@ -13,7 +13,7 @@ public class Parser
     }
 
     private List<Statement> nodes = new();
-    static List<string> AssigmentOperators = new()
+    static List<string> AssignmentOperators = new()
     {
         "=", "+=", "-=", "/=", "*="
     };
@@ -113,7 +113,7 @@ public class Parser
         return new(value, new Position(startPos, endPos));
     }
 
-    private VarAssigmentStatement parseVarAssigment(IdentifierExpression target)
+    private VarAssignmentStatement parseVarAssignment(IdentifierExpression target)
     {
         var @operator = current.Lexeme;
         advance();
@@ -156,7 +156,7 @@ public class Parser
             case TokenType.Identifier :
             {
                 var id = parseIdentifier();
-                if (AssigmentOperators.Any(x => current.Lexeme == x)) return parseVarAssigment(id);
+                if (AssignmentOperators.Any(x => current.Lexeme == x)) return parseVarAssignment(id);
                 consume(TokenType.Semicolon, "Expected ';'");
                 return new StatementExpression(id);
             }
@@ -296,7 +296,7 @@ public class Parser
     {
         var ex = parseAsExpression();
         
-        while (match(TokenType.Slash) || match(TokenType.Asteric))
+        while (match(TokenType.Slash) || match(TokenType.Asterisk))
         {
             var op = last.Lexeme;
             var right = parseAsExpression();

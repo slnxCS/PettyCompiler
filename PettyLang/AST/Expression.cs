@@ -37,7 +37,7 @@ public class IdentifierExpressionPart(Position position, string id, Expression[]
     public readonly Expression[][] FuncCallsArguments = funcCallArguments;
 
     public readonly Expression[]? ArrayAppealArgumentsBeforeFuncCall = arrayAppealArgumentsBeforeFuncCall;
-    public readonly Expression[]? ArrayAppealArgumentsAftersFuncCall = arrayAppealArgumentsAftersFuncCall;
+    public readonly Expression[]? ArrayAppealArgumentsAfterFuncCall = arrayAppealArgumentsAftersFuncCall;
 
     public Symbol Resolved = null!;
     public FunctionOverload? ResolvedOverload = null;

@@ -17,6 +17,10 @@ public class Scope
         if (Type == ScopeType.Instance && Self == null)
             throw new ArgumentNullException("self");
 
+        if (Type == ScopeType.Global) 
+            GlobalFreeIDSet = new();
+        else GlobalFreeIDSet = Parent!.GlobalFreeIDSet;
+
         freeIDSet = Type switch
         {
             ScopeType.Global => GlobalFreeIDSet,
@@ -44,7 +48,7 @@ public class Scope
         public int FreeClassID = 0;
     }
 
-    private static IDSet GlobalFreeIDSet = new();
+    private IDSet GlobalFreeIDSet;
     private IDSet freeIDSet;
 
     public int GetFreeVarID()
@@ -73,7 +77,7 @@ public class Scope
 
         foreach (var classFunction in classScope.Functions.Values)
         {
-            var method = new MethodSymbol(classFunction.Name, this);
+            var method = new MethodSymbol(classFunction.Name, this, classFunction.Position, analyzer, @class.Native);
             foreach (var overload in classFunction.Overloads)
             {
                 method.AddOverload(overload);

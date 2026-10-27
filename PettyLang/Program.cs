@@ -3,18 +3,21 @@ using PettyLang.Compiler;
 using PettyLang.Errors;
 using PettyLang.Semantic;
 using System.CommandLine;
+using System.CommandLine.Help;
+using System.Globalization;
 
 namespace PettyLang;
 
 public class Program
 {
-    public const double VERSION = 0.1f;
+    public const string VERSION = "0.1";
 
     public static byte[] Start(string sourceCode)
     {
         var parser = new Parser.Parser(sourceCode);
         var AST = parser.Parse();
-        var analyzer = new Analyzer();
+        var constantPool = new ConstantPool();
+        var analyzer = new Analyzer(constantPool);
         analyzer.Analyze(AST);
         var compiler = new CompileFabric(AST);
         var compiled = compiler.Build(analyzer);
@@ -24,7 +27,7 @@ public class Program
     private static async Task<string> GetFileText(string path)
     {
         if (!File.Exists(path)) 
-            throw new FileNotFoundException($"File '{path}' does not exsist");
+            throw new FileNotFoundException($"File '{path}' does not exist");
 
         return await File.ReadAllTextAsync(path);
     }
@@ -43,25 +46,26 @@ public class Program
         var rootCommand = new RootCommand($"Pettylang compiler v{VERSION}")
             {sourceOption, versionOption, debugOption, outputOption};
 
+        rootCommand.Options.Remove(rootCommand.Options.OfType<VersionOption>().Single());
+
         rootCommand.SetAction(async (res) =>
         {
             var version = res.GetRequiredValue(versionOption);
             if (version)
             {
                 Console.WriteLine($"Compiler version : {VERSION}");
-                Console.WriteLine($"Bytecode version : {HeaderCompiler.BYTECODE_VERSION}");
+                Console.WriteLine(
+                    $"Bytecode version : {HeaderCompiler.BYTECODE_VERSION.ToString(CultureInfo.InvariantCulture)}");
                 return;
             }
 
-            var path = res.GetRequiredValue(sourceOption);
-            var isDebug = res.GetRequiredValue(debugOption);
-            var outPath = res.GetRequiredValue(outputOption);
+            var path = res.GetValue(sourceOption);
+            var isDebug = res.GetValue(debugOption);
+            var outPath = res.GetValue(outputOption);
 
             if (string.IsNullOrEmpty(path) || string.IsNullOrEmpty(outPath))
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Error: Both --file (-f) and --out (-o) options are required for compilation.");
-                Console.ResetColor();
+                new HelpAction().Invoke(res);
                 return;
             }
 

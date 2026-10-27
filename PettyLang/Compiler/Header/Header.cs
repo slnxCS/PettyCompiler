@@ -8,13 +8,13 @@ public class HeaderCompiler
 
     public static readonly byte[] MAGIC = Encoding.ASCII.GetBytes("[PTVM]");
 
-    public byte[] Compile()
+    public byte[] Compile(ConstantPool constantPool)
     {
         var list = new List<byte>();
         list.AddRange(MAGIC);
         list.AddRange(BitConverter.GetBytes(BYTECODE_VERSION));
-        list.AddRange(BitConverter.GetBytes(ConstantPool.ConstantsCount));
-        list.AddRange(ConstantPool.GetBytes());
+        list.AddRange(BitConverter.GetBytes(constantPool.ConstantsCount));
+        list.AddRange(constantPool.GetBytes());
 
         return list.ToArray();
     }

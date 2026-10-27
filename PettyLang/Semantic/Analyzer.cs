@@ -1,11 +1,13 @@
 using PettyLang.AST;
+using PettyLang.Compiler;
 using PettyLang.Errors;
 
 namespace PettyLang.Semantic;
 
 public class Analyzer
 {
-    private Scope currentScope = Native.GlobalScope;
+    public readonly Native Native;
+    private Scope currentScope;
     private FunctionOverload? currentFunction = null;
     private ClassSymbol? currentClass = null;
     public FunctionOverload? MainFunction;
@@ -14,6 +16,7 @@ public class Analyzer
     public Dictionary<ClassSymbol, List<FunctionOverload>> Methods = new();
     public List<ClassDefineStatement> Classes = new();
     private bool returnFinded;
+    public readonly ConstantPool ConstantPool;
 
     private void AddClassToList(ClassSymbol @class)
     {
@@ -22,8 +25,6 @@ public class Analyzer
 
     private void InitClassList()
     {
-        if (!Native.Inited) Native.Init();
-
         AddClassToList(Native.ObjectClass);
         AddClassToList(Native.ValueObjectClass);
         AddClassToList(Native.VoidClass);
@@ -31,11 +32,14 @@ public class Analyzer
         AddClassToList(Native.Float32Class);
         AddClassToList(Native.BoolClass);
         AddClassToList(Native.FunctionClass);
+        AddClassToList(Native.ArrayClass);
     }
 
-    public Analyzer()
+    public Analyzer(ConstantPool constantPool)
     {
-        Native.Init();
+        ConstantPool = constantPool;
+        Native = new Native(this);
+        currentScope = Native.GlobalScope;
         InitClassList();
     }
 
@@ -83,9 +87,9 @@ public class Analyzer
                 break;
             }
 
-            case VarAssigmentStatement varAssigment :
+            case VarAssignmentStatement varAssignment :
             {
-                VisitVarAssigment(varAssigment);
+                VisitVarAssignment(varAssignment);
                 break;
             }
 
@@ -120,7 +124,7 @@ public class Analyzer
             derived = derivedSym as ClassSymbol ?? 
                 throw new Error($"Class must derived from another class, not {derivedSym.GetType().Name}", "Semantic", @class.Derived.Position);
         }
-        var sym = new ClassSymbol(@class.Name, currentScope, @class.Position, derived);
+        var sym = new ClassSymbol(@class.Name, currentScope, @class.Position, derived, Native);
         @class.Resolved = sym;
         currentScope.DefineClass(sym);
 
@@ -194,7 +198,7 @@ public class Analyzer
             throw new Error($"Cannot do this operation outside a function", "Semantic", position);
     }
 
-    void VisitVarAssigment(VarAssigmentStatement statement)
+    void VisitVarAssignment(VarAssignmentStatement statement)
     {
         ensureFunc(statement.Position);
 
@@ -256,9 +260,9 @@ public class Analyzer
         var fs = currentScope.GetFunc(func.Name, false);
         if (fs == null) {
             if (currentClass == null)
-                fs = new FunctionSymbol(func.Name, currentScope);
+                fs = new FunctionSymbol(func.Name, currentScope, func.Position, this, Native);
             else 
-                fs = new MethodSymbol(func.Name, currentClass.Members);
+                fs = new MethodSymbol(func.Name, currentClass.Members, func.Position, this, Native);
             currentScope.DefineFunc(fs);
         }
 
@@ -306,9 +310,9 @@ public class Analyzer
         var fs = currentScope.GetFunc(func.Name, false);
         if (fs == null) {
             if (currentClass == null)
-                fs = new FunctionSymbol(func.Name, currentScope);
+                fs = new FunctionSymbol(func.Name, currentScope, func.Position, this, Native);
             else 
-                fs = new MethodSymbol(func.Name, currentClass.Members);
+                fs = new MethodSymbol(func.Name, currentClass.Members, func.Position, this, Native);
             currentScope.DefineFunc(fs);
         }
 
@@ -404,7 +408,7 @@ public class Analyzer
         else
         {
             resolvedType = GetSymType(ResolveIdentifierExpression(varDecl.Type!));
-            resolved = resolvedType.GetInstance(resolvedType.Members, resolvedType.Position);
+            resolved = resolvedType.GetInstance(resolvedType.Members, resolvedType.Position, this);
         }
 
 
@@ -415,12 +419,14 @@ public class Analyzer
                 throw new Error($"Cannot convert from '{resolvedType.GetFullName()}' to '{type.GetFullName()}'", "Semantic", resolvedType.Position);
         }
         if (type == Native.VoidClass) 
-            throw new Error($"cannot assign a value of type void to a variable", $"Semantic", varDecl.Value.Position);
+            throw new Error($"cannot assign a value of type void to a variable", $"Semantic", varDecl.Value?.Position ?? varDecl.Position);
         var value = GetInstanceSymbol(resolved);
         varDecl.Resolved = new(varDecl.Name, varDecl.Position, currentScope, type, value);
         currentScope.DefineVar(varDecl.Resolved);
         if (varDecl.Resolved.IsGlobal)
             GlobalVariables.Add(varDecl);
+
+        return;
     }
 
     public VarSymbol[] ResolveFieldsDecl(List<VarDeclStatement> fields, ClassInstanceSymbol instance)
@@ -437,7 +443,7 @@ public class Analyzer
             else
             {
                 resolvedType = GetSymType(ResolveIdentifierExpression(field.Type!));
-                resolved = resolvedType.GetInstance(instance.Members, instance.Position);
+                resolved = resolvedType.GetInstance(instance.Members, instance.Position, this);
             }
             var type = field.Type == null ? resolvedType : GetSymType(field.Type);
             if (field.Type != null)
@@ -446,7 +452,7 @@ public class Analyzer
                     throw new Error($"Cannot convert from '{resolvedType.GetFullName()}' to '{type.GetFullName()}'", "Semantic", resolvedType.Position);
             }
             if (type == Native.VoidClass) 
-                throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value?.Position ?? resolved.Position);
+                throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value?.Position ?? field.Position);
             var value = GetInstanceSymbol(resolved);
             field.Resolved = new(field.Name, field.Position, instance.Members, type, value);
             vars.Add(field.Resolved);
@@ -467,18 +473,18 @@ public class Analyzer
         {
             case IntExpression i : 
             {
-                i.Resolved = new Int32InstanceSymbol(currentScope, Native.Int32Class, i.Number, i.Position);
+                i.Resolved = new Int32InstanceSymbol(currentScope, Native.Int32Class, i.Number, i.Position, this);
                 return i.Resolved;
             }
             case FloatExpression f : 
             {
-                f.Resolved = new Float32InstanceSymbol(currentScope, Native.Float32Class, f.Number, f.Position);
+                f.Resolved = new Float32InstanceSymbol(currentScope, Native.Float32Class, f.Number, f.Position, this);
                 return f.Resolved;
             }
 
             case BoolExpression b :
             {
-                b.Resolved = new(b.Value, currentScope, b.Position);
+                b.Resolved = new(b.Value, currentScope, b.Position, this);
                 return b.Resolved;
             }
 
@@ -558,7 +564,7 @@ public class Analyzer
 
     public ClassInstanceSymbol GetInstanceSymbol(ClassSymbol sym, Position position)
     {
-        return sym.GetInstance(currentScope, position);
+        return sym.GetInstance(currentScope, position, this);
     }
 
     ClassInstanceSymbol ResolveBin(BinaryExpression bin)

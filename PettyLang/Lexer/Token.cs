@@ -16,7 +16,7 @@ public enum TokenType
 
     // Symbols :
 
-    Plus, Minus, Slash, Asteric, Equate, Equals, 
+    Plus, Minus, Slash, Asterisk, Equate, Equals, 
     PlusEquate, MinusEquate, DivideEquate, MultiplyEquate,
     LParen, RParen, LSquareBracket, RSquareBracket, LCurlyBrace, RCurlyBrace,
     Colon, Semicolon, LAngleBrace, RAngleBrace, Dot, Comma,

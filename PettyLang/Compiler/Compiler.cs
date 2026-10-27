@@ -98,7 +98,7 @@ public class Compiler
         }
     }
 
-    void CompileAssign(VarAssigmentStatement statement)
+    void CompileAssign(VarAssignmentStatement statement)
     {
         if (statement.Operator != "=")
             throw new NotImplementedException();
@@ -220,8 +220,8 @@ public class Compiler
                 CompileExpression(expr.Expression);
             break;
 
-            case VarAssigmentStatement varAssigment :
-                CompileAssign(varAssigment);
+            case VarAssignmentStatement varAssignment :
+                CompileAssign(varAssignment);
             break;
 
             case BlockStatement block : 
@@ -351,7 +351,7 @@ public class Compiler
     public byte[] Compile(HeaderCompiler headerCompiler)
     {
         compiled.Clear();
-        compiled.AddRange(headerCompiler.Compile());
+        compiled.AddRange(headerCompiler.Compile(analyzer.ConstantPool));
         WriteFunctions(analyzer.Functions);
         WriteClasses();
 

@@ -10,9 +10,9 @@ public class Native {
         public readonly FunctionSymbol Function;
         public BuiltInFunctionOverload[] Overloads;
 
-        public BuiltinFunction(string name, BuiltInFunctionOverload[] overloads, Analyzer analyzer, Scope declaredIn)
+        public BuiltinFunction(string name, BuiltInFunctionOverload[] overloads, Analyzer analyzer, Native native, Scope declaredIn)
         {
-            Function = new(name, declaredIn, default, analyzer);
+            Function = new(name, declaredIn, default, analyzer, native);
             Overloads = overloads;
         }
 
@@ -44,15 +44,15 @@ public class Native {
 
     public Native(Analyzer analyzer)
     {
-        ObjectClass = new("Object", GlobalScope, default, null);
-        ValueObjectClass = new("ValueObject", GlobalScope, default, ObjectClass);
-        VoidClass = new("void", GlobalScope, default, ObjectClass);
+        ObjectClass = new("Object", GlobalScope, default, null, this);
+        ValueObjectClass = new("ValueObject", GlobalScope, default, ObjectClass, this);
+        VoidClass = new("void", GlobalScope, default, ObjectClass, this);
 
-        ArrayClass = new();
-        Int32Class = new();
-        Float32Class = new();
-        BoolClass = new();
-        FunctionClass = new("function", GlobalScope, default, ObjectClass);
+        ArrayClass = new(this);
+        Int32Class = new(this);
+        Float32Class = new(this);
+        BoolClass = new(this);
+        FunctionClass = new("function", GlobalScope, default, ObjectClass, this);
 
         BuiltinFunctions =
         [
@@ -62,34 +62,34 @@ public class Native {
                     new([new("number", default, Int32Class)], VoidClass, 0), 
                     new([new("number", default, Float32Class)], VoidClass, 1),
                     new([new("value", default, BoolClass)], VoidClass, 2)
-                ], analyzer, GlobalScope
+                ], analyzer, this, GlobalScope
             ),
 
             new(
                 "read", 
                 [
                     new([], Int32Class, 3)
-                ], analyzer, GlobalScope
+                ], analyzer, this, GlobalScope
             ),
 
             new(
                 "random",
                 [
                     new([new("min", default, Int32Class), new("max", default, Int32Class)], Int32Class, 4),
-                ], analyzer, GlobalScope
+                ], analyzer, this, GlobalScope
             ),
 
             new (
                 "get", [
                     new([new("array", default, ArrayClass), new("index", default, Int32Class)], Int32Class, 5),
-                ], analyzer, GlobalScope
+                ], analyzer, this, GlobalScope
             ),
 
             new (
                 "set", [
                     new([new("array", default, ArrayClass), new("index", default, Int32Class), new("num", default, Int32Class)], 
                         VoidClass, 6),
-                ], analyzer, GlobalScope
+                ], analyzer, this, GlobalScope
             ),
         ];
 
@@ -98,7 +98,7 @@ public class Native {
 
     private void DefineArray(Analyzer analyzer)
     {
-        ArrayClass.Constructor = new ArrayConstructorFunctionSymbol(analyzer);
+        ArrayClass.Constructor = new ArrayConstructorFunctionSymbol(analyzer, this);
         ArrayClass.Constructor.AddOverload(new([new("self", default, ArrayClass), new("Length", default, Int32Class)], default, 
             VoidClass, null, 
         compiler =>

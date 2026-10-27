@@ -36,12 +36,12 @@ public record BoolConstant(bool value) : Constant(ConstantType.CONSTANT_BOOL)
     }
 }
 
-public static class ConstantPool
+public class ConstantPool
 {
-    private static readonly Dictionary<Constant, int> lookup = new();
-    private static readonly List<Constant> constants = new();
+    private readonly Dictionary<Constant, int> lookup = new();
+    private readonly List<Constant> constants = new();
 
-    public static int Add(Constant constant)
+    public int Add(Constant constant)
     {
         if (lookup.TryGetValue(constant, out var index))
             return index;
@@ -54,9 +54,9 @@ public static class ConstantPool
         return index;
     }
 
-    public static int ConstantsCount => constants.Count;
+    public int ConstantsCount => constants.Count;
 
-    public static byte[] GetBytes()
+    public byte[] GetBytes()
     {
         var list = new List<byte>();
         foreach (var constant in constants)

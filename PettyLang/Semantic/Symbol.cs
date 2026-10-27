@@ -81,11 +81,6 @@ public class VarSymbol : Symbol
 
     public bool IsGlobal => DeclaredIn.Type == ScopeType.Global;
 
-    public byte[] GetStoreBytes()
-    {
-        return [(byte)(IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL), .. BitConverter.GetBytes(ID)];
-    }
-
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
     {
         if (DeclaredIn.Self == null) {
@@ -135,10 +130,14 @@ public class ClassInstanceSymbol : Symbol
     public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position, Analyzer analyzer)
         : base(@class.GetFullName(), null, @class, declaredIn, position)
     {
+        this.analyzer = analyzer;
+        Native = @class.Native;
         selfScope = new(ScopeType.Instance, DeclaredIn, this);
         selfScope.CopyFromClass(@class, analyzer);
     }
 
+    protected readonly Native Native;
+    protected readonly Analyzer analyzer;
     private Scope selfScope;
     public override Scope Members => selfScope;
 
@@ -158,11 +157,11 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
     public bool IsConstant => Value != null;
 
     public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position, Analyzer analyzer) 
-        : base(globalScope, floatClass ?? Native.Float32Class, position, analyzer)
+        : base(globalScope, floatClass ?? analyzer.Native.Float32Class, position, analyzer)
     {
         Value = value;
         if (Value != null)
-            ConstantPool.Add(new FloatConstant(Value.GetValueOrDefault()));
+            analyzer.ConstantPool.Add(new FloatConstant(Value.GetValueOrDefault()));
     }
 
     public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
@@ -204,7 +203,7 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
 
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
     {
-        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new FloatConstant(Value 
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(analyzer.ConstantPool.Add(new FloatConstant(Value 
             ?? throw new NullReferenceException("Value"))))];
     }
 
@@ -235,12 +234,12 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         Value = value;
         
         if (Value != null)
-            ConstantPool.Add(new IntConstant(value.GetValueOrDefault()));
+            analyzer.ConstantPool.Add(new IntConstant(value.GetValueOrDefault()));
     }
 
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
     {
-        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(ConstantPool.Add(new IntConstant(Value 
+        return [(byte)OpCode.PUSH_CONSTANT, .. BitConverter.GetBytes(analyzer.ConstantPool.Add(new IntConstant(Value 
             ?? throw new NullReferenceException("Value"))))];
     }
 
@@ -317,9 +316,12 @@ public class ClassSymbol : Symbol
         return [(byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(baseConstructor.Overload.ID), .. BitConverter.GetBytes(1)];
     }
 
-    public ClassSymbol(string name, Scope declaredIn, Position position, ClassSymbol? derived) : 
-        base(name, Native.GlobalScope.GetFreeClassID(), null, declaredIn, position)
+    public readonly Native Native;
+
+    public ClassSymbol(string name, Scope declaredIn, Position position, ClassSymbol? derived, Native native) : 
+        base(name, native.GlobalScope.GetFreeClassID(), null, declaredIn, position)
     {
+        Native = native;
         ClassScope = new(ScopeType.Class, declaredIn);
         Derived = derived;
     }
@@ -348,7 +350,8 @@ public class ClassSymbol : Symbol
 
 public class ArrayClassSymbol : ClassSymbol
 {
-    public ArrayClassSymbol() : base("Array", Native.GlobalScope, default, Native.ObjectClass) { }
+    public ArrayClassSymbol(Native native) 
+        : base("Array", native.GlobalScope, default, native.ObjectClass, native) { }
 
     public override ArrayInstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
@@ -359,13 +362,14 @@ public class ArrayClassSymbol : ClassSymbol
 public class ArrayInstanceSymbol : ClassInstanceSymbol
 {
     public ArrayInstanceSymbol(Scope declaredIn, Position position, Analyzer analyzer) 
-        : base(declaredIn, Native.ArrayClass, position, analyzer) 
+        : base(declaredIn, analyzer.Native.ArrayClass, position, analyzer) 
     { }
 }
 
 public class Int32ClassSymbol : ClassSymbol
 {
-    public Int32ClassSymbol() : base("int32", Native.GlobalScope, default, Native.ValueObjectClass) { }
+    public Int32ClassSymbol(Native native) 
+        : base("int32", native.GlobalScope, default, native.ValueObjectClass, native) { }
 
     public override Int32InstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
@@ -375,7 +379,8 @@ public class Int32ClassSymbol : ClassSymbol
 
 public class Float32ClassSymbol : ClassSymbol
 {
-    public Float32ClassSymbol() : base("float32", Native.GlobalScope, default, Native.ValueObjectClass) { }
+    public Float32ClassSymbol(Native native) 
+        : base("float32", native.GlobalScope, default, native.ValueObjectClass, native) { }
 
     public override Float32InstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
@@ -388,24 +393,25 @@ public class BoolInstanceSymbol : ClassInstanceSymbol
     public bool? Value;
 
     public BoolInstanceSymbol(bool? value, Scope declaredIn, Position position, Analyzer analyzer) 
-        : base(declaredIn, Native.BoolClass, position, analyzer)
+        : base(declaredIn, analyzer.Native.BoolClass, position, analyzer)
     {
         Value = value;
 
         if (Value != null)
-            ConstantPool.Add(new BoolConstant(Value.GetValueOrDefault()));
+            analyzer.ConstantPool.Add(new BoolConstant(Value.GetValueOrDefault()));
     }
 
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
     {
         return [(byte)OpCode.PUSH_CONSTANT, 
-            ..BitConverter.GetBytes(ConstantPool.Add(new BoolConstant(Value ?? throw new ArgumentNullException())))];
+            ..BitConverter.GetBytes(analyzer.ConstantPool.Add(new BoolConstant(Value ?? throw new ArgumentNullException())))];
     }
 }
 
 public class BoolClassSymbol : ClassSymbol
 {
-    public BoolClassSymbol() : base("bool", Native.GlobalScope, default, Native.ValueObjectClass) { }
+    public BoolClassSymbol(Native native) 
+        : base("bool", native.GlobalScope, default, native.ValueObjectClass, native) { }
 
     public override BoolInstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
@@ -448,7 +454,7 @@ public class BasicConstructorSymbol : ConstructorFunctionSymbol
 
 public class ArrayConstructorFunctionSymbol : ConstructorFunctionSymbol
 {
-    public ArrayConstructorFunctionSymbol(Analyzer analyzer) : base(Native.ArrayClass, true, analyzer, null) {}
+    public ArrayConstructorFunctionSymbol(Analyzer analyzer, Native native) : base(native.ArrayClass, true, analyzer, null) {}
     
 
     // Make sure compiler has emited length before call
@@ -463,7 +469,7 @@ public class ConstructorFunctionSymbol : MethodSymbol
     public readonly bool IsAutoGenerated;
     public readonly ClassSymbol Class;
     public ConstructorFunctionSymbol(ClassSymbol @class, bool isAutoGenerated, Analyzer analyzer, Position? position) 
-        : base(@class.Name, @class.Members, position ?? default, analyzer)
+        : base(@class.Name, @class.Members, position ?? default, analyzer, @class.Native)
     {
         Class = @class;
         IsAutoGenerated = isAutoGenerated;
@@ -489,8 +495,8 @@ public class ConstructorFunctionSymbol : MethodSymbol
 
 public class MethodSymbol : FunctionSymbol
 {
-    public MethodSymbol(string name, Scope declaredIn, Position position, Analyzer analyzer) 
-        : base(name, declaredIn, position, analyzer)
+    public MethodSymbol(string name, Scope declaredIn, Position position, Analyzer analyzer, Native native) 
+        : base(name, declaredIn, position, analyzer, native)
     { }
 
     public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
@@ -499,9 +505,7 @@ public class MethodSymbol : FunctionSymbol
             throw new ArgumentNullException(nameof(part.ResolvedOverload));
 
         var ov = part.ResolvedOverload;
-        //var owner = part.Last();
-        //if (owner == null)
-        //    throw new NullReferenceException(nameof(owner));
+        
         return [(byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
     }
 
@@ -542,8 +546,8 @@ public class FunctionSymbol : ClassInstanceSymbol
         return ar;
     }
 
-    public FunctionSymbol(string name, Scope declaredIn, Position position, Analyzer analyzer) 
-        : base(declaredIn, Native.FunctionClass, position, analyzer)
+    public FunctionSymbol(string name, Scope declaredIn, Position position, Analyzer analyzer, Native native) 
+        : base(declaredIn, native.FunctionClass, position, analyzer)
     {
         Name = name;
     }
