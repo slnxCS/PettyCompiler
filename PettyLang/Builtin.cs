@@ -3,16 +3,16 @@ using PettyLang.Semantic;
 
 namespace PettyLang;
 
-public static class BuiltIn {
+public class Native {
 
     private class BuiltinFunction
     {
         public readonly FunctionSymbol Function;
         public BuiltInFunctionOverload[] Overloads;
 
-        public BuiltinFunction(string name, BuiltInFunctionOverload[] overloads, Scope? declaredIn = null)
+        public BuiltinFunction(string name, BuiltInFunctionOverload[] overloads, Analyzer analyzer, Scope declaredIn)
         {
-            Function = new(name, declaredIn ?? GlobalScope);
+            Function = new(name, declaredIn, default, analyzer);
             Overloads = overloads;
         }
 
@@ -30,26 +30,25 @@ public static class BuiltIn {
         }
     }
 
-    private static BuiltinFunction[] BuiltinFunctions = null!;
+    private BuiltinFunction[] BuiltinFunctions;
 
-    public static bool Inited {get; private set; } = false;
+    public bool Inited {get; private set; } = false;
 
-    public static ClassSymbol VoidClass = null!, ObjectClass = null!, ValueObjectClass = null!, FunctionClass = null!;
-    public static Int32ClassSymbol Int32Class = null!;
-    public static Float32ClassSymbol Float32Class = null!;
-    public static BoolClassSymbol BoolClass = null!;
-    public static ClassSymbol? StringClass = null;
-    public static readonly Scope GlobalScope = new(ScopeType.Global, null);
+    public ClassSymbol VoidClass, ObjectClass, ValueObjectClass, FunctionClass;
+    public Int32ClassSymbol Int32Class;
+    public Float32ClassSymbol Float32Class;
+    public BoolClassSymbol BoolClass;
+    public ArrayClassSymbol ArrayClass;
+    public ClassSymbol? StringClass = null;
+    public readonly Scope GlobalScope = new(ScopeType.Global, null);
 
-    public static void Init()
+    public Native(Analyzer analyzer)
     {
-        if (Inited) return;
-        else Inited = true;
-
         ObjectClass = new("Object", GlobalScope, default, null);
         ValueObjectClass = new("ValueObject", GlobalScope, default, ObjectClass);
         VoidClass = new("void", GlobalScope, default, ObjectClass);
 
+        ArrayClass = new();
         Int32Class = new();
         Float32Class = new();
         BoolClass = new();
@@ -63,38 +62,62 @@ public static class BuiltIn {
                     new([new("number", default, Int32Class)], VoidClass, 0), 
                     new([new("number", default, Float32Class)], VoidClass, 1),
                     new([new("value", default, BoolClass)], VoidClass, 2)
-                ]
+                ], analyzer, GlobalScope
             ),
 
             new(
                 "read", 
                 [
                     new([], Int32Class, 3)
-                ]
+                ], analyzer, GlobalScope
             ),
 
             new(
                 "random",
                 [
                     new([new("min", default, Int32Class), new("max", default, Int32Class)], Int32Class, 4),
-                ]
+                ], analyzer, GlobalScope
+            ),
+
+            new (
+                "get", [
+                    new([new("array", default, ArrayClass), new("index", default, Int32Class)], Int32Class, 5),
+                ], analyzer, GlobalScope
+            ),
+
+            new (
+                "set", [
+                    new([new("array", default, ArrayClass), new("index", default, Int32Class), new("num", default, Int32Class)], 
+                        VoidClass, 6),
+                ], analyzer, GlobalScope
             ),
         ];
 
-        Define();
+        Define(analyzer);
     }
 
-    public static void Define()
+    private void DefineArray(Analyzer analyzer)
     {
+        ArrayClass.Constructor = new ArrayConstructorFunctionSymbol(analyzer);
+        ArrayClass.Constructor.AddOverload(new([new("self", default, ArrayClass), new("Length", default, Int32Class)], default, 
+            VoidClass, null, 
+        compiler =>
+        {
+            
+        }));
+    }
+
+    private void Define(Analyzer analyzer)
+    {
+        GlobalScope.DefineClass(ObjectClass);
+        GlobalScope.DefineClass(ValueObjectClass);
         GlobalScope.DefineClass(Int32Class);
         GlobalScope.DefineClass(Float32Class);
         GlobalScope.DefineClass(VoidClass);
         GlobalScope.DefineClass(FunctionClass);
-        GlobalScope.DefineClass(ObjectClass);
-        GlobalScope.DefineClass(ValueObjectClass);
         GlobalScope.DefineClass(BoolClass);
-        
-        if (StringClass != null) GlobalScope.DefineClass(StringClass);
+        GlobalScope.DefineClass(ArrayClass);
+        DefineArray(analyzer);
 
         foreach (var bf in BuiltinFunctions)
         {

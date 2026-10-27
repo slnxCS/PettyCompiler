@@ -1,21 +1,30 @@
-class Vector : {
-    var X = 10;
-    var Y = 20;
-
-    var End : Vector;
-
-    func PrintSelf() : {
-        print(self.X);
-        print(self.Y);
-        End.PrintSelf();
+func array_write(ar : Array, index : int32, stopIndex : int32) : {
+    set(ar, index, read());
+    index = index + 1;
+    if index == stopIndex : {
+        return;
     }
+
+    array_write(ar, index, stopIndex);
 }
 
-func print(vec : Vector) : {
-    vec.PrintSelf();
+func print_element(ar : Array, index : int32, stopIndex : int32) : {
+    print(get(ar, index));
+    index = index + 1;
+    if index == stopIndex : {
+        return;
+    }
+
+    print_element(ar, index, stopIndex);
+}
+
+func print(ar : Array, len : int32) : {
+    print_element(ar, 0, len - 1);
 }
 
 func Main() : {
-    var vec = Vector();
-    print(vec);
+    var len = 10;
+    var ar = Array(len);
+    array_write(ar, 0, len - 1);
+    print(ar, len);
 }

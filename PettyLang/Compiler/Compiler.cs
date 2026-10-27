@@ -43,6 +43,9 @@ public enum OpCode : byte
     CALL_METHOD = 30,
     LOAD_FIELD = 31,
     STORE_FIELD = 32,
+    ALLOCATE_ARR = 35,
+    ARR_GET = 36,
+    ARR_SET = 37,
 }
 
 public class Compiler
@@ -260,8 +263,6 @@ public class Compiler
         Emit(analyzer.GlobalVariables.Count);
         foreach (var global in analyzer.GlobalVariables)
         {
-            if (!global.Resolved.IsGlobal)
-                throw new NotImplementedException("There should be here a warning");
             CompileExpression(global.Value);
             Emit(OpCode.STORE_GLOBAL);
             Emit(global.Resolved.ID);
@@ -358,10 +359,10 @@ public class Compiler
         WriteGlobals();
         CompileStatements(ASTNodes);
         Emit(OpCode.CALL);
-        if (Analyzer.MainFunction == null)
+        if (analyzer.MainFunction == null)
             throw new Error("Missing main function (entry point)", "compiler", default);
-        Emit(Analyzer.MainFunction.ID);
-        Emit(Analyzer.MainFunction.Arity);
+        Emit(analyzer.MainFunction.ID);
+        Emit(analyzer.MainFunction.Arity);
         Emit(OpCode.HALT);
         return compiled.ToArray();
     }

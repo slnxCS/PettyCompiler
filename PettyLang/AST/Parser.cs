@@ -1,6 +1,5 @@
 namespace PettyLang.Parser;
 
-using System.Runtime.Intrinsics.Arm;
 using PettyLang.AST;
 using PettyLang.Errors;
 using PettyLang.Tokens;

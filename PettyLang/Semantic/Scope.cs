@@ -64,7 +64,7 @@ public class Scope
         return freeIDSet.FreeClassID++;
     }
 
-    public void CopyFromClass(ClassSymbol @class)
+    public void CopyFromClass(ClassSymbol @class, Analyzer analyzer)
     {
         if (Type != ScopeType.Instance || Self == null) 
             throw new InvalidOperationException();
@@ -82,7 +82,7 @@ public class Scope
         }
         classes = new(classScope.classes);
 
-        foreach (var var in Analyzer.Current.ResolveFieldsDecl(@class.VarDefines, Self))
+        foreach (var var in analyzer.ResolveFieldsDecl(@class.VarDefines, Self))
         {
             DefineVar(var);
         }

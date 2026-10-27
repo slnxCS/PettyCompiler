@@ -8,22 +8,6 @@ public class CompileFabric(Statement[] ast)
 {   
     private readonly Statement[] ast = ast;
 
-    /*
-    [PTVM]
-    BC_VER
-    CONSTANTS_COUNT
-    CONSTANTS_TABLE
-    GLOBALS_COUNT
-    GLOBAL_TABLE
-    HALT
-    FUNCTIONS_COUNT
-    FUNCTIONS
-    CLASS_COUNT
-    CLASS_TABLE
-    BYTE_CODE
-    (HALT)
-    */
-
     public byte[] Build(Analyzer analyzer)
     {
         var compiler = new Compiler(ast, analyzer);

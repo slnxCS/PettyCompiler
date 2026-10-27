@@ -63,11 +63,6 @@ public abstract class Symbol
         throw new NotSupportedException($"Cannot push '{GetFullName()}'");
     }
 
-    public virtual ClassInstanceSymbol GetOwner()
-    {
-        throw new NotImplementedException();
-    }
-
     public virtual string GetFullName()
     {
         return Name;
@@ -100,14 +95,6 @@ public class VarSymbol : Symbol
         {
             return [(byte)OpCode.LOAD_FIELD, .. BitConverter.GetBytes(ID)];
         }
-    }
-
-    public override ClassInstanceSymbol GetOwner()
-    {
-        if (DeclaredIn.Self != null)
-            return DeclaredIn.Self;
-        else 
-            throw new NotImplementedException();
     }
 
     public override void CompileBinaryOperation(BinaryExpression expression, Compiler.Compiler compiler)
@@ -145,11 +132,11 @@ public class VarSymbol : Symbol
 
 public class ClassInstanceSymbol : Symbol
 {
-    public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position)
+    public ClassInstanceSymbol(Scope declaredIn, ClassSymbol @class, Position position, Analyzer analyzer)
         : base(@class.GetFullName(), null, @class, declaredIn, position)
     {
         selfScope = new(ScopeType.Instance, DeclaredIn, this);
-        selfScope.CopyFromClass(@class);
+        selfScope.CopyFromClass(@class, analyzer);
     }
 
     private Scope selfScope;
@@ -170,7 +157,8 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
     public float? Value;
     public bool IsConstant => Value != null;
 
-    public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position) : base(globalScope, floatClass ?? BuiltIn.Float32Class, position)
+    public Float32InstanceSymbol(Scope globalScope, ClassSymbol? floatClass, float? value, Position position, Analyzer analyzer) 
+        : base(globalScope, floatClass ?? Native.Float32Class, position, analyzer)
     {
         Value = value;
         if (Value != null)
@@ -180,7 +168,7 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
     public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
     {
         if (castType is Int32ClassSymbol)
-            return BuiltIn.Int32Class;
+            return Native.Int32Class;
         
         return base.ResolveCast(castType, expression);
     }
@@ -227,10 +215,10 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         
         return expression.Operator switch
         {
-            "+" => BuiltIn.Float32Class,
-            "-" => BuiltIn.Float32Class,
-            "*" => BuiltIn.Float32Class,
-            "/" => BuiltIn.Float32Class,
+            "+" => Native.Float32Class,
+            "-" => Native.Float32Class,
+            "*" => Native.Float32Class,
+            "/" => Native.Float32Class,
             _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
         };
     }
@@ -241,7 +229,8 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
     public int? Value;
     public bool IsConstant => Value != null;
 
-    public Int32InstanceSymbol(Scope globalScope, ClassSymbol intClass, int? value, Position position) : base(globalScope, intClass, position)
+    public Int32InstanceSymbol(Scope globalScope, ClassSymbol intClass, int? value, Position position, Analyzer analyzer) 
+        : base(globalScope, intClass, position, analyzer)
     {
         Value = value;
         
@@ -258,7 +247,7 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
     public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
     {
         if (castType is Float32ClassSymbol)
-            return BuiltIn.Float32Class;
+            return Native.Float32Class;
         
         return base.ResolveCast(castType, expression);
     }
@@ -300,11 +289,11 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         
         return expression.Operator switch
         {
-            "+" => BuiltIn.Int32Class,
-            "-" => BuiltIn.Int32Class,
-            "*" => BuiltIn.Int32Class,
-            "/" => BuiltIn.Float32Class,
-            "==" => BuiltIn.BoolClass,
+            "+" => Native.Int32Class,
+            "-" => Native.Int32Class,
+            "*" => Native.Int32Class,
+            "/" => Native.Float32Class,
+            "==" => Native.BoolClass,
           _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
         };
     }
@@ -318,7 +307,7 @@ public class ClassSymbol : Symbol
     public readonly List<VarDeclStatement> VarDefines = new();
 
     private BasicConstructorSymbol? baseConstructor;
-    public readonly ConstructorFunctionSymbol? Constructor;
+    public ConstructorFunctionSymbol? Constructor;
     private ConstructorFunctionSymbol? autoConstructor = null;
 
     public byte[] GetBasicConstructorCallBytes()
@@ -329,50 +318,68 @@ public class ClassSymbol : Symbol
     }
 
     public ClassSymbol(string name, Scope declaredIn, Position position, ClassSymbol? derived) : 
-        base(name, BuiltIn.GlobalScope.GetFreeClassID(), null, declaredIn, position)
+        base(name, Native.GlobalScope.GetFreeClassID(), null, declaredIn, position)
     {
         ClassScope = new(ScopeType.Class, declaredIn);
         Derived = derived;
     }
 
-    public virtual ClassInstanceSymbol GetInstance(Scope scope, Position position)
+    public virtual ClassInstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
-        return new(scope, this, position);
+        return new(scope, this, position, analyzer);
     }
 
-    public (ClassInstanceSymbol, FunctionOverload) ResolveCall(FunctionParameter[] arguments, Analyzer analyzer, IdentifierExpressionPart part)
+    public (ClassInstanceSymbol, FunctionOverload) ResolveCall(
+        FunctionParameter[] arguments, Analyzer analyzer, IdentifierExpressionPart part)
     {
         if (baseConstructor == null)
         {
-            baseConstructor = new(this);
+            baseConstructor = new(this, analyzer);
         }
         if (Constructor == null && autoConstructor == null)
         {
-            autoConstructor = autoConstructor = new(this, true);
-            autoConstructor.AddOverload(new([new("self", Position, this)], Position, this, null, null));
+            autoConstructor = new(this, true, analyzer, null);
+            autoConstructor.AddOverload(new([new("self", Position, this)], Position, this, null, (_) => {}));
         }
         var constructor = Constructor ?? autoConstructor;
         return constructor!.ResolveCall(arguments, analyzer, part);
     }
 }
 
+public class ArrayClassSymbol : ClassSymbol
+{
+    public ArrayClassSymbol() : base("Array", Native.GlobalScope, default, Native.ObjectClass) { }
+
+    public override ArrayInstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
+    {
+        return new ArrayInstanceSymbol(scope, position, analyzer);
+    }
+}
+
+public class ArrayInstanceSymbol : ClassInstanceSymbol
+{
+    public ArrayInstanceSymbol(Scope declaredIn, Position position, Analyzer analyzer) 
+        : base(declaredIn, Native.ArrayClass, position, analyzer) 
+    { }
+}
+
 public class Int32ClassSymbol : ClassSymbol
 {
-    public Int32ClassSymbol() : base("int32", BuiltIn.GlobalScope, default, BuiltIn.ValueObjectClass) { }
+    public Int32ClassSymbol() : base("int32", Native.GlobalScope, default, Native.ValueObjectClass) { }
 
-    public override Int32InstanceSymbol GetInstance(Scope scope, Position position)
+    public override Int32InstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
-        return new Int32InstanceSymbol(scope, this, null, position);
+        return new Int32InstanceSymbol(scope, this, null, position, analyzer);
     }
 }
 
 public class Float32ClassSymbol : ClassSymbol
 {
-    public Float32ClassSymbol() : base("float32", BuiltIn.GlobalScope, default, BuiltIn.ValueObjectClass) { }
+    public Float32ClassSymbol() : base("float32", Native.GlobalScope, default, Native.ValueObjectClass) { }
 
-    public override Float32InstanceSymbol GetInstance(Scope scope, Position position)
+    public override Float32InstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
-        return new Float32InstanceSymbol(scope, this, null, position);
+        return new Float32InstanceSymbol(scope, this, null, position, analyzer);
     }
 }
 
@@ -380,7 +387,8 @@ public class BoolInstanceSymbol : ClassInstanceSymbol
 {
     public bool? Value;
 
-    public BoolInstanceSymbol(bool? value, Scope declaredIn, Position position) : base(declaredIn, BuiltIn.BoolClass, position)
+    public BoolInstanceSymbol(bool? value, Scope declaredIn, Position position, Analyzer analyzer) 
+        : base(declaredIn, Native.BoolClass, position, analyzer)
     {
         Value = value;
 
@@ -397,11 +405,11 @@ public class BoolInstanceSymbol : ClassInstanceSymbol
 
 public class BoolClassSymbol : ClassSymbol
 {
-    public BoolClassSymbol() : base("bool", BuiltIn.GlobalScope, default, BuiltIn.ValueObjectClass) { }
+    public BoolClassSymbol() : base("bool", Native.GlobalScope, default, Native.ValueObjectClass) { }
 
-    public override BoolInstanceSymbol GetInstance(Scope scope, Position position)
+    public override BoolInstanceSymbol GetInstance(Scope scope, Position position, Analyzer analyzer)
     {
-        return new BoolInstanceSymbol(null, scope, position);
+        return new BoolInstanceSymbol(null, scope, position, analyzer);
     }
 }
 
@@ -426,15 +434,27 @@ public class BasicConstructorSymbol : ConstructorFunctionSymbol
         compiler.Emit(0);
         compiler.Emit(OpCode.RET);
     }
-    public BasicConstructorSymbol(ClassSymbol klass) : base(klass, true)
+    public BasicConstructorSymbol(ClassSymbol klass, Analyzer analyzer) : base(klass, true, analyzer, null)
     {
         Overload = new([new("self", Class.Position, Class)], Class.Position, Class, null, getOvBytes);
         AddOverload(Overload);
         Overload.LocalsCount = 1; // take into account the 'self' parameter
         Class.Members.DefineFunc(this);
-        if (!Analyzer.Current.Methods.ContainsKey(Class))
-            Analyzer.Current.Methods.Add(Class, []);
-        Analyzer.Current.Methods[Class].Add(Overload);
+        if (!analyzer.Methods.ContainsKey(Class))
+            analyzer.Methods.Add(Class, []);
+        analyzer.Methods[Class].Add(Overload);
+    }
+}
+
+public class ArrayConstructorFunctionSymbol : ConstructorFunctionSymbol
+{
+    public ArrayConstructorFunctionSymbol(Analyzer analyzer) : base(Native.ArrayClass, true, analyzer, null) {}
+    
+
+    // Make sure compiler has emited length before call
+    public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
+    {        
+        return [(byte)OpCode.ALLOCATE_ARR];
     }
 }
 
@@ -442,7 +462,8 @@ public class ConstructorFunctionSymbol : MethodSymbol
 {
     public readonly bool IsAutoGenerated;
     public readonly ClassSymbol Class;
-    public ConstructorFunctionSymbol(ClassSymbol @class, bool isAutoGenerated) : base(@class.Name, @class.Members)
+    public ConstructorFunctionSymbol(ClassSymbol @class, bool isAutoGenerated, Analyzer analyzer, Position? position) 
+        : base(@class.Name, @class.Members, position ?? default, analyzer)
     {
         Class = @class;
         IsAutoGenerated = isAutoGenerated;
@@ -468,9 +489,9 @@ public class ConstructorFunctionSymbol : MethodSymbol
 
 public class MethodSymbol : FunctionSymbol
 {
-    public MethodSymbol(string name, Scope declaredIn) : base(name, declaredIn)
-    {
-    }
+    public MethodSymbol(string name, Scope declaredIn, Position position, Analyzer analyzer) 
+        : base(name, declaredIn, position, analyzer)
+    { }
 
     public override byte[] GetBytesForCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
     {
@@ -521,7 +542,8 @@ public class FunctionSymbol : ClassInstanceSymbol
         return ar;
     }
 
-    public FunctionSymbol(string name, Scope declaredIn) : base(declaredIn, BuiltIn.FunctionClass, default)
+    public FunctionSymbol(string name, Scope declaredIn, Position position, Analyzer analyzer) 
+        : base(declaredIn, Native.FunctionClass, position, analyzer)
     {
         Name = name;
     }
@@ -631,6 +653,7 @@ public class FunctionParameter(string name, Position position, ClassSymbol type)
         return $"{Name + (Name != "" ? " :" : "")} {Type.GetFullName()}";
     }
 }
+
 
 public class BuiltInFunctionOverload : FunctionOverload
 {

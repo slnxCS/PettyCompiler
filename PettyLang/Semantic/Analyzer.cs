@@ -5,16 +5,15 @@ namespace PettyLang.Semantic;
 
 public class Analyzer
 {
-    private Scope currentScope = BuiltIn.GlobalScope;
+    private Scope currentScope = Native.GlobalScope;
     private FunctionOverload? currentFunction = null;
     private ClassSymbol? currentClass = null;
-    public static FunctionOverload? MainFunction;
+    public FunctionOverload? MainFunction;
     public List<VarDeclStatement> GlobalVariables = new();
     public List<FuncDefineStatement> Functions = new();
     public Dictionary<ClassSymbol, List<FunctionOverload>> Methods = new();
     public List<ClassDefineStatement> Classes = new();
     private bool returnFinded;
-    public static Analyzer Current = null!;
 
     private void AddClassToList(ClassSymbol @class)
     {
@@ -23,21 +22,20 @@ public class Analyzer
 
     private void InitClassList()
     {
-        if (!BuiltIn.Inited) BuiltIn.Init();
+        if (!Native.Inited) Native.Init();
 
-        AddClassToList(BuiltIn.ObjectClass);
-        AddClassToList(BuiltIn.ValueObjectClass);
-        AddClassToList(BuiltIn.VoidClass);
-        AddClassToList(BuiltIn.Int32Class);
-        AddClassToList(BuiltIn.Float32Class);
-        AddClassToList(BuiltIn.BoolClass);
-        AddClassToList(BuiltIn.FunctionClass);
+        AddClassToList(Native.ObjectClass);
+        AddClassToList(Native.ValueObjectClass);
+        AddClassToList(Native.VoidClass);
+        AddClassToList(Native.Int32Class);
+        AddClassToList(Native.Float32Class);
+        AddClassToList(Native.BoolClass);
+        AddClassToList(Native.FunctionClass);
     }
 
     public Analyzer()
     {
-        Current = this;
-        BuiltIn.Init();
+        Native.Init();
         InitClassList();
     }
 
@@ -172,7 +170,7 @@ public class Analyzer
     {
         ensureFunc(statement.Position);
         var condition = GetInstanceSymbol(ResolveExpression(statement.Condition));
-        if (condition.Type != BuiltIn.BoolClass)
+        if (condition.Type != Native.BoolClass)
         {
             throw new NotImplementedException();
         }
@@ -217,7 +215,7 @@ public class Analyzer
     {
         ensureFunc(statement.Position);
         
-        ClassSymbol resolved = statement.Value != null ? GetSymType(ResolveExpression(statement.Value)) : BuiltIn.VoidClass;
+        ClassSymbol resolved = statement.Value != null ? GetSymType(ResolveExpression(statement.Value)) : Native.VoidClass;
 
         if (resolved != currentFunction!.ReturnType)
             throw new Error($"Cannot convert from {resolved.Type.GetFullName()} to {currentFunction.ReturnType.GetFullName()}", 
@@ -264,7 +262,7 @@ public class Analyzer
             currentScope.DefineFunc(fs);
         }
 
-        var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null? BuiltIn.VoidClass : 
+        var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null? Native.VoidClass : 
                 GetSymType(ResolveExpression(func.ReturnType)), func, null);
 
         func.Resolved = ov;
@@ -281,7 +279,7 @@ public class Analyzer
             {
                 throw new Error("Main entry point is already exist in this program", "Semantic", ov.Position);
             }
-            if (ov.ReturnType != BuiltIn.VoidClass)
+            if (ov.ReturnType != Native.VoidClass)
             {
                 throw new Error("Main function must return void", "Semantic", ov.Position);
             }
@@ -314,7 +312,7 @@ public class Analyzer
             currentScope.DefineFunc(fs);
         }
 
-        var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null ? BuiltIn.VoidClass : 
+        var ov = new FunctionOverload(ResolveParams(func.Parameters), func.Position, func.ReturnType == null ? Native.VoidClass : 
                 GetSymType(ResolveExpression(func.ReturnType)), func, null);
 
         func.Resolved = ov;
@@ -331,7 +329,7 @@ public class Analyzer
             {
                 throw new Error("Main entry point is already exist in this program", "Semantic", ov.Position);
             }
-            if (ov.ReturnType != BuiltIn.VoidClass)
+            if (ov.ReturnType != Native.VoidClass)
             {
                 throw new Error("Main function must return void", "Semantic", ov.Position);
             }
@@ -382,7 +380,7 @@ public class Analyzer
             ov.LocalsCount = currentScope.GetFreeVarID();
             currentScope = lastScope;
             currentFunction = oldFunc;
-            if (!returnFinded && ov.ReturnType != BuiltIn.VoidClass) 
+            if (!returnFinded && ov.ReturnType != Native.VoidClass) 
                 throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", ov.Position);
         }
     }
@@ -416,7 +414,7 @@ public class Analyzer
             if (type != resolvedType) 
                 throw new Error($"Cannot convert from '{resolvedType.GetFullName()}' to '{type.GetFullName()}'", "Semantic", resolvedType.Position);
         }
-        if (type == BuiltIn.VoidClass) 
+        if (type == Native.VoidClass) 
             throw new Error($"cannot assign a value of type void to a variable", $"Semantic", varDecl.Value.Position);
         var value = GetInstanceSymbol(resolved);
         varDecl.Resolved = new(varDecl.Name, varDecl.Position, currentScope, type, value);
@@ -447,7 +445,7 @@ public class Analyzer
                 if (type != resolvedType) 
                     throw new Error($"Cannot convert from '{resolvedType.GetFullName()}' to '{type.GetFullName()}'", "Semantic", resolvedType.Position);
             }
-            if (type == BuiltIn.VoidClass) 
+            if (type == Native.VoidClass) 
                 throw new Error($"cannot assign a value of type void to a variable", $"Semantic", field.Value?.Position ?? resolved.Position);
             var value = GetInstanceSymbol(resolved);
             field.Resolved = new(field.Name, field.Position, instance.Members, type, value);
@@ -469,12 +467,12 @@ public class Analyzer
         {
             case IntExpression i : 
             {
-                i.Resolved = new Int32InstanceSymbol(currentScope, BuiltIn.Int32Class, i.Number, i.Position);
+                i.Resolved = new Int32InstanceSymbol(currentScope, Native.Int32Class, i.Number, i.Position);
                 return i.Resolved;
             }
             case FloatExpression f : 
             {
-                f.Resolved = new Float32InstanceSymbol(currentScope, BuiltIn.Float32Class, f.Number, f.Position);
+                f.Resolved = new Float32InstanceSymbol(currentScope, Native.Float32Class, f.Number, f.Position);
                 return f.Resolved;
             }
 
@@ -484,7 +482,7 @@ public class Analyzer
                 return b.Resolved;
             }
 
-            case StringExpression : return BuiltIn.StringClass ?? 
+            case StringExpression : return Native.StringClass ?? 
                 throw new Error("To use the String type, import the String class from the std module (import String from std)", "Semantic", expr.Position);
             case IdentifierExpression id : return ResolveIdentifierExpression(id);
             case IdentifierExpressionPart idPart : {
