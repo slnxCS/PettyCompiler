@@ -250,7 +250,7 @@ public class Compiler
         var oldLen = compiled.Count;
         Emit(0);
         CompileStatements(statement.Block.Statements);
-        SetReservedBytes(oldLen, BitConverter.GetBytes(oldLen + 4));
+        SetReservedBytes(oldLen, BitConverter.GetBytes(compiled.Count));
     }
 
     void CompileStatements(Statement[] sts)
