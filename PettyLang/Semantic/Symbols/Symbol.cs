@@ -46,8 +46,11 @@ public abstract class Symbol
 
     public virtual void CompileCastBytes(ClassSymbol castType, AsExpression expression, Compiler.Compiler compiler)
     {
-        if (castType == Type)
+        if (castType == Type) 
+        {
+            compiler.CompileExpression(expression.Value);
             return;
+        }
         throw new NotSupportedCastTypeError(GetFullName(), castType.GetFullName(), expression.Position);
     }
 
