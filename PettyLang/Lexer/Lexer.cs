@@ -17,7 +17,7 @@ public class Lexer(string source)
     {
         if (current == '\n')
         {
-            _currentPositionX = 0;
+            _currentPositionX = 1;
             _currentPositionY++;
         }
         else _currentPositionX++;
@@ -99,7 +99,7 @@ public class Lexer(string source)
     private void _addID()
     {
         var str = "";
-        var startPos = _currentPosition2DIncrement;
+        var startPos = _currentPosition2D;
         while (!isEnd && (char.IsLetterOrDigit(current) || current == '_'))
         {
             str += current;
@@ -118,7 +118,7 @@ public class Lexer(string source)
     private Token _processID()
     {
         var str = "";
-        var startPos = _currentPosition2DIncrement;
+        var startPos = _currentPosition2D;
         while (!isEnd && (char.IsLetterOrDigit(current) || current == '_'))
         {
             str += current;
@@ -138,14 +138,7 @@ public class Lexer(string source)
     {
         var num = "";
         var isFloat = false;
-        var startPos = _currentPosition2DIncrement;
-        var isNegative = current == '-';
-
-        if (isNegative)
-        {
-            num += '-';
-            advance();
-        }
+        var startPos = _currentPosition2D;
 
         while (!isEnd && char.IsDigit(current))
         {
@@ -155,7 +148,7 @@ public class Lexer(string source)
             {
                 if (isFloat) break;
                 isFloat = true;
-                num += ',';
+                num += '.';
                 advance();
             }
         }
@@ -169,14 +162,7 @@ public class Lexer(string source)
     {
         var num = "";
         var isFloat = false;
-        var startPos = _currentPosition2DIncrement;
-        var isNegative = current == '-';
-
-        if (isNegative)
-        {
-            num += '-';
-            advance();
-        }
+        var startPos = _currentPosition2D;
 
         while (!isEnd && char.IsDigit(current))
         {
@@ -186,7 +172,7 @@ public class Lexer(string source)
             {
                 if (isFloat) break;
                 isFloat = true;
-                num += ',';
+                num += '.';
                 advance();
             }
         }
@@ -199,7 +185,7 @@ public class Lexer(string source)
     public void _addString()
     {
         var str = "";
-        var startPos = _currentPosition2DIncrement;
+        var startPos = _currentPosition2D;
 
         Point2D? endl = null;
 
@@ -225,7 +211,7 @@ public class Lexer(string source)
     public Token _processString()
     {
         var str = "";
-        var startPos = _currentPosition2DIncrement;
+        var startPos = _currentPosition2D;
 
         Point2D? endl = null;
 
@@ -364,7 +350,7 @@ public class Lexer(string source)
         if (char.IsLetter(current) || current == '_') return _processID();
         else if (current == '\"') return _processString();
         else if (current == '\'') return _processChar();
-        else if (char.IsDigit(current) || current == '-' && hasNextSymbol && char.IsDigit(next)) return _processNumber();
+        else if (char.IsDigit(current)) return _processNumber();
         else return _processSymbol();
     }
 
@@ -410,7 +396,7 @@ public class Lexer(string source)
             if (char.IsLetter(current) || current == '_') _addID();
             else if (current == '\"') _addString();
             else if (current == '\'') _addChar();
-            else if (char.IsDigit(current) || current == '-' && hasNextSymbol && char.IsDigit(next)) _addNumber();
+            else if (char.IsDigit(current)) _addNumber();
             else _addSymbol();
         }
 

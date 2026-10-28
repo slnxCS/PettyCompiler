@@ -86,6 +86,13 @@ public class BinaryExpression(Position position, Expression left, string @operat
     public readonly string Operator = @operator;
 }
 
+public class UnaryExpression(Position position, string @operator, Expression right) : Expression(position)
+{
+    public readonly Expression Right = right;
+    public Symbol RightSymbol = null!;
+    public readonly string Operator = @operator;
+}
+
 public class AsExpression(Expression value, IdentifierExpression asType, Position position) : Expression(position)
 {
     public readonly Expression Value = value;

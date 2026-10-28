@@ -127,7 +127,6 @@ public class LexerTests
 
     [TestCase("0", "0")]
     [TestCase("42", "42")]
-    [TestCase("-7", "-7")]
     [TestCase("2147483647", "2147483647")]
     public void IntNumbers(string source, string lexeme)
     {
@@ -138,7 +137,6 @@ public class LexerTests
     }
 
     [TestCase("3.14")]
-    [TestCase("-0.5")]
     [TestCase("10.0")]
     public void FloatNumbers(string source)
     {

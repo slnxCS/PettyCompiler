@@ -1,5 +1,6 @@
 namespace PettyLang.Parser;
 
+using System.Globalization;
 using PettyLang.AST;
 using PettyLang.Errors;
 using PettyLang.Tokens;
@@ -321,7 +322,7 @@ public class Parser
 
     private Expression parseAsExpression()
     {
-        var ex = parseAfterIdentifierExpression();
+        var ex = parseUnaryExpression();
 
         while (match(TokenType.As))
         {
@@ -332,15 +333,21 @@ public class Parser
         return ex;
     }
 
-    private Expression parseAfterIdentifierExpression()
+    private Expression parseUnaryExpression()
     {
-        var ex = parsePrimaryBasicExpression();
-        //if (current.Type == TokenType.Dot)
-        //    return parseIdentifier(ex);
-//
-        //if (ex is IdentifierExpressionPart idPart) ex = new IdentifierExpression(idPart.Position, idPart, []);
+        if (match(TokenType.Minus))
+        {
+            var startPos = last.Position.Start;
+            var ex = parsePrimaryBasicExpression();
 
-        return ex;
+            if (ex is IntExpression i) return new IntExpression(-i.Number, i.Position);
+            if (ex is FloatExpression f) return new FloatExpression(-f.Number, f.Position);
+
+            return new UnaryExpression(new(startPos, ex.Position.End), "-", ex);
+        }
+        
+
+        return parsePrimaryBasicExpression();
     }
 
     private Expression parsePrimaryBasicExpression()
@@ -356,7 +363,7 @@ public class Parser
             case TokenType.FloatNumber :
             {
                 advance();
-                return new FloatExpression(float.Parse(last.Lexeme), last.Position);
+                return new FloatExpression(float.Parse(last.Lexeme, CultureInfo.InvariantCulture), last.Position);
             }
 
             case TokenType.False :
