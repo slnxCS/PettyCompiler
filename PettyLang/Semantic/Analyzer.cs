@@ -207,7 +207,8 @@ public class Analyzer
             throw new Error
                 ($"The assignment operation cannot be applied to {target.Type.GetFullName()}", "Semantic", statement.Target.Position);
         var value = GetInstanceSymbol(ResolveExpression(statement.Value));
-
+        statement.Resolved = var;
+        statement.ResolvedValue = value;
         if (statement.Operator == "=")
         {
             if (target.Type != value.Type)
@@ -215,11 +216,8 @@ public class Analyzer
         }
         else
         {
-            
+            var.Value.VisitEquatingOperator(statement, this, currentScope, value);
         }
-
-        statement.Resolved = var;
-        statement.ResolvedValue = value;
     }
 
     void VisitReturn(ReturnStatement statement)
@@ -505,8 +503,15 @@ public class Analyzer
             }
             case BinaryExpression bin : return ResolveBin(bin);
             case AsExpression @as : return ResolveCastExpr(@as);
+            case UnaryExpression unary : return ResolveUnaryExpression(unary);
             default : throw new NotImplementedException($"{expr}");
         }
+    }
+
+    ClassInstanceSymbol ResolveUnaryExpression(UnaryExpression expression)
+    {
+        expression.Resolved = GetInstanceSymbol(ResolveExpression(expression.Right));
+        return expression.Resolved.VisitUnary(expression).GetInstance(currentScope, expression.Position, this);
     }
 
     T[] DefineAll<T, TFuncResult>(Statement[] statements, Func<T, TFuncResult> defAction)

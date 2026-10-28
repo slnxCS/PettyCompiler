@@ -121,24 +121,43 @@ public class Compiler
 
     void CompileAssign(VarAssignmentStatement statement)
     {
-        if (statement.Operator != "=")
-            throw new NotImplementedException();
+        ArgumentNullException.ThrowIfNull(statement.Resolved);
+        ArgumentNullException.ThrowIfNull(statement.ResolvedValue);
 
-        if (statement.Resolved == null)
-            throw new NullReferenceException();
-
-        CompileExpression(statement.Value);
-        if (statement.Resolved.DeclaredIn.Type == ScopeType.Instance)
+        if (statement.Operator == "=") 
         {
-            CompileIdentifierExpressionWithoutLast(statement.Target);
+            CompileExpression(statement.Value);
+            if (statement.Resolved.DeclaredIn.Type == ScopeType.Instance)
+            {
+                CompileIdentifierExpressionWithoutLast(statement.Target);
+                Emit(OpCode.STORE_FIELD);
+            }
+            else 
+            {
+                Emit(statement.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
+            }
+
+            Emit(statement.Resolved.ID);
+        }
+        else
+        {
+            statement.Resolved.Value.CompileEquatingOperator(statement, this);
+        }
+    }
+
+    public void CompilePushVar(IdentifierExpression target, VarSymbol var)
+    {
+        if (var.DeclaredIn.Type == ScopeType.Instance)
+        {
+            CompileIdentifierExpressionWithoutLast(target);
             Emit(OpCode.STORE_FIELD);
         }
         else 
         {
-            Emit(statement.Resolved.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
+            Emit(var.IsGlobal ? OpCode.STORE_GLOBAL : OpCode.STORE_LOCAL);
         }
 
-        Emit(statement.Resolved.ID);
+        Emit(var.ID);
     }
 
     public void CompileExpression(Expression ex)
@@ -173,6 +192,11 @@ public class Compiler
                 @as.ResolvedValue.CompileCastBytes(@as.ResolvedAsType, @as, this);
             break;
 
+            case UnaryExpression unary :
+                ArgumentNullException.ThrowIfNull(unary.Resolved, nameof(unary.Resolved));
+                unary.Resolved.CompileUnaryOperation(unary, this);
+            break;
+
             default : throw new NotImplementedException(ex.ToString());
         }
     }
@@ -196,7 +220,7 @@ public class Compiler
         compiled.AddRange(sym.GetPushBytes(part));
     }
 
-    void CompileIdentifierExpression(IdentifierExpression id)
+    public void CompileIdentifierExpression(IdentifierExpression id)
     {
         CompileExpression(id.FirstPart);
         foreach (var part in id.OtherParts) 
@@ -205,7 +229,7 @@ public class Compiler
         }
     }
 
-    void CompileIdentifierExpressionWithoutLast(IdentifierExpression id)
+    public void CompileIdentifierExpressionWithoutLast(IdentifierExpression id)
     {
         if (id.OtherParts.Length == 0) return;
 

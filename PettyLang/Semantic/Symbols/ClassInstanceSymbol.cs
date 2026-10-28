@@ -255,9 +255,12 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         ArgumentNullException.ThrowIfNull(statement.ResolvedValue);
         ArgumentNullException.ThrowIfNull(statement.Resolved);
 
-        compiler.Emit(statement.Resolved.GetPushBytes(null));
+        compiler.CompileExpression(statement.Target);
         compiler.CompileExpression(statement.Value);
         compiler.Emit(binaryOperators[statement.Operator.Replace("=", "")].Item1);
+        if (statement.Operator == "/=")
+            compiler.Emit(OpCode.CAST_FROM_FLOAT32_TO_INT32); // DIV_INT pushs float32 to stack, but the variable has int32 type 
+        compiler.CompilePushVar(statement.Target, statement.Resolved);
     }
 }
 
