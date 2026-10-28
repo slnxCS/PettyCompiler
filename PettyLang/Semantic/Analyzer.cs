@@ -176,7 +176,8 @@ public class Analyzer
         var condition = GetInstanceSymbol(ResolveExpression(statement.Condition));
         if (condition.Type != Native.BoolClass)
         {
-            throw new NotImplementedException();
+            throw new Error($"Cannot convert from '{condition.Type.GetFullName()}' to '{Native.BoolClass.GetFullName()}'", 
+                "Semantic", statement.Condition.Position);
         }
 
         var oldScope = currentScope;
@@ -201,18 +202,24 @@ public class Analyzer
     void VisitVarAssignment(VarAssignmentStatement statement)
     {
         ensureFunc(statement.Position);
-
-        if (statement.Operator != "=")
-            throw new NotImplementedException(statement.Operator);
-
         var target = ResolveExpression(statement.Target);
         if (target is not VarSymbol var)
-            throw new Error($"The assignment operation cannot be applied to {target.Type.GetFullName()}", "Semantic", statement.Target.Position);
-        var value = ResolveExpression(statement.Value);
-        if (target.Type != value.Type)
-            throw new Error($"Cannot convert from {value.Type.GetFullName()} to {target.Type.GetFullName()}", "Semantic", statement.Value.Position);
+            throw new Error
+                ($"The assignment operation cannot be applied to {target.Type.GetFullName()}", "Semantic", statement.Target.Position);
+        var value = GetInstanceSymbol(ResolveExpression(statement.Value));
+
+        if (statement.Operator == "=")
+        {
+            if (target.Type != value.Type)
+                throw new Error($"Cannot convert from {value.Type.GetFullName()} to {target.Type.GetFullName()}", "Semantic", statement.Value.Position);
+        }
+        else
+        {
+            
+        }
 
         statement.Resolved = var;
+        statement.ResolvedValue = value;
     }
 
     void VisitReturn(ReturnStatement statement)

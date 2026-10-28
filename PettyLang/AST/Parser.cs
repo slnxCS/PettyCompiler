@@ -28,6 +28,7 @@ public class Parser
     private bool isEnd => current.Type == TokenType.EOF;
 
     private void advance() => position++;
+    private void retreat() => position--;
     private bool match(TokenType type, bool needAdvance = true)
     {
         if (current.Type == type)
@@ -277,16 +278,49 @@ public class Parser
 
     private Expression parseExpression()
     {
-        return parseEquals();
+        return parseAndOr();
     }
 
-    private Expression parseEquals()
+    private Expression parseAndOr()
+    {
+        var ex = parseComparison();
+
+        while (match(TokenType.Identifier, false) && current.Lexeme == "and" 
+            || match(TokenType.Identifier,false) && current.Lexeme == "or")
+        {
+            var op = current.Lexeme;
+            var startPos = current.Position.Start;
+            advance();
+            Expression? right;
+
+            try
+            {
+                right = parseAndOr();
+            }
+            catch
+            {
+                right = null;
+            }
+
+            if (right != null)
+            {
+                ex = new BinaryExpression(new(startPos, right.Position.End), ex, op, right);
+            }
+            else retreat();
+        }
+
+        return ex;
+    }
+
+    private Expression parseComparison()
     {
         var ex = parseAdditive();
-        while (match(TokenType.Equals))
+        while (match(TokenType.Equals) || match(TokenType.LessOrEquals) || match(TokenType.GreaterOrEquals) 
+            || match(TokenType.LAngleBrace) || match(TokenType.RAngleBrace) || match(TokenType.NotEquals))
         {
+            var op = last.Lexeme;
             var right = parseAdditive();
-            ex = new BinaryExpression(new(ex.Position.Start, right.Position.End), ex, "==", right);
+            ex = new BinaryExpression(new(ex.Position.Start, right.Position.End), ex, op, right);
         }
 
         return ex;
@@ -344,6 +378,26 @@ public class Parser
             if (ex is FloatExpression f) return new FloatExpression(-f.Number, f.Position);
 
             return new UnaryExpression(new(startPos, ex.Position.End), "-", ex);
+        }
+        else if (match(TokenType.Identifier, false) && current.Lexeme == "not")
+        {
+            var startPos = current.Position.Start;
+            advance();
+            bool isKeyWord = true;
+            Expression ex;
+            try 
+            {
+                ex = parseUnaryExpression();
+            }
+            catch { isKeyWord = false; ex = null!; }
+
+            if (isKeyWord) 
+            {
+                if (ex is BoolExpression b) return new BoolExpression(!b.Value, b.Position);
+
+                return new UnaryExpression(new(startPos, ex.Position.End), "not", ex);
+            }
+            else retreat();
         }
         
 

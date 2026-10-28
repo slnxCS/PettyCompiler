@@ -13,7 +13,11 @@ public class ClassInstanceSymbol : Symbol
         Native = @class.Native;
         selfScope = new(ScopeType.Instance, DeclaredIn, this);
         selfScope.CopyFromClass(@class, analyzer);
+        binaryOperators = new();
+        unaryOperators = new();
     }
+
+    protected Dictionary<string, (OpCode, ClassSymbol)> binaryOperators, unaryOperators;
 
     protected readonly Native Native;
     protected readonly Analyzer analyzer;
@@ -41,6 +45,25 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         Value = value;
         if (Value != null)
             analyzer.ConstantPool.Add(new FloatConstant(Value.GetValueOrDefault()));
+
+        binaryOperators = new Dictionary<string, (OpCode, ClassSymbol)>()
+        {
+            {"+", (OpCode.ADD_FLOAT, analyzer.Native.Float32Class)},
+            {"-", (OpCode.SUB_FLOAT, analyzer.Native.Float32Class)},
+            {"*", (OpCode.MUL_FLOAT, analyzer.Native.Float32Class)},
+            {"/", (OpCode.DIV_FLOAT, analyzer.Native.Float32Class)},
+            {"==", (OpCode.FLOAT_EQ, analyzer.Native.BoolClass)},
+            {">=", (OpCode.FLOAT_GEQ, analyzer.Native.BoolClass)},
+            {"<=", (OpCode.FLOAT_LEQ, analyzer.Native.BoolClass)},
+            {"<", (OpCode.FLOAT_LE, analyzer.Native.BoolClass)},
+            {">", (OpCode.FLOAT_GE, analyzer.Native.BoolClass)},  
+            {"!=", (OpCode.FLOAT_NEQ, analyzer.Native.BoolClass)},
+        };
+
+        unaryOperators = new()
+        {
+            {"-", (OpCode.FLOAT_NEG, analyzer.Native.Float32Class)},
+        };
     }
 
     public override ClassSymbol ResolveCast(ClassSymbol castType, AsExpression expression)
@@ -62,14 +85,6 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         base.CompileCastBytes(castType, expression, compiler);
     }
 
-    static readonly Dictionary<string, OpCode> operators = new()
-    {
-        {"+", OpCode.ADD_FLOAT},
-        {"-", OpCode.SUB_FLOAT},
-        {"*", OpCode.MUL_FLOAT},
-        {"/", OpCode.DIV_FLOAT},
-    };
-
     public override void CompileBinaryOperation(BinaryExpression expression, Compiler compiler)
     {
         var lintExpr = expression.Left;
@@ -77,7 +92,7 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         
         compiler.CompileExpression(lintExpr);
         compiler.CompileExpression(rintExpr);
-        compiler.Emit(operators[expression.Operator]);
+        compiler.Emit(binaryOperators[expression.Operator].Item1);
     }
 
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
@@ -91,14 +106,44 @@ public class Float32InstanceSymbol : ClassInstanceSymbol
         if (right is not Float32InstanceSymbol)
             throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
         
-        return expression.Operator switch
-        {
-            "+" => Native.Float32Class,
-            "-" => Native.Float32Class,
-            "*" => Native.Float32Class,
-            "/" => Native.Float32Class,
-            _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
-        };
+        if (binaryOperators.TryGetValue(expression.Operator, out var res))
+            return res.Item2;
+
+        throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public override void CompileUnaryOperation(UnaryExpression expression, Compiler compiler)
+    {
+        var expr = expression.Right;
+        
+        compiler.CompileExpression(expr);
+        compiler.Emit(unaryOperators[expression.Operator].Item1);
+    }
+
+    public override ClassSymbol VisitUnary(UnaryExpression expression)
+    {        
+        if (unaryOperators.TryGetValue(expression.Operator, out var res))
+            return res.Item2;
+
+        throw new NotSupportedOperandsError(GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public override void VisitEquatingOperator(
+        VarAssignmentStatement statement, Analyzer analyzer, Scope scope, ClassInstanceSymbol right)
+    {
+        if (right.Type != Type)
+            throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), statement.Position);
+    }
+
+    public override void CompileEquatingOperator(
+        VarAssignmentStatement statement, Compiler compiler)
+    {
+        ArgumentNullException.ThrowIfNull(statement.ResolvedValue);
+        ArgumentNullException.ThrowIfNull(statement.Resolved);
+
+        compiler.Emit(statement.Resolved.GetPushBytes(null));
+        compiler.CompileExpression(statement.Value);
+        compiler.Emit(binaryOperators[statement.Operator.Replace("=", "")].Item1);
     }
 }
 
@@ -114,6 +159,25 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         
         if (Value != null)
             analyzer.ConstantPool.Add(new IntConstant(value.GetValueOrDefault()));
+
+        binaryOperators = new Dictionary<string, (OpCode, ClassSymbol)>()
+        {
+            {"+", (OpCode.ADD_INT, analyzer.Native.Int32Class)},
+            {"-", (OpCode.SUB_INT, analyzer.Native.Int32Class)},
+            {"*", (OpCode.MUL_INT, analyzer.Native.Int32Class)},
+            {"/", (OpCode.DIV_INT, analyzer.Native.Int32Class)},
+            {"==", (OpCode.INT_EQ, analyzer.Native.BoolClass)},
+            {">=", (OpCode.INT_GEQ, analyzer.Native.BoolClass)},
+            {"<=", (OpCode.INT_LEQ, analyzer.Native.BoolClass)},
+            {"<", (OpCode.INT_LE, analyzer.Native.BoolClass)},
+            {">", (OpCode.INT_GE, analyzer.Native.BoolClass)},
+            {"!=", (OpCode.INT_NEQ, analyzer.Native.BoolClass)},
+        };
+
+        unaryOperators = new()
+        {
+            {"-", (OpCode.INT_NEG, analyzer.Native.Int32Class)},  
+        };
     }
 
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
@@ -141,15 +205,6 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         base.CompileCastBytes(castType, expression, compiler);
     }
 
-    static Dictionary<string, OpCode> operators = new()
-    {
-        {"+", OpCode.ADD_INT},
-        {"-", OpCode.SUB_INT},
-        {"*", OpCode.MUL_INT},
-        {"/", OpCode.DIV_INT},
-        {"==", OpCode.INT_EQ},
-    };
-
     public override void CompileBinaryOperation(BinaryExpression expression, Compiler compiler)
     {
         var lintExpr = expression.Left;
@@ -157,7 +212,7 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         
         compiler.CompileExpression(lintExpr);
         compiler.CompileExpression(rintExpr);
-        compiler.Emit(operators[expression.Operator]);
+        compiler.Emit(binaryOperators[expression.Operator].Item1);
     }
 
     public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
@@ -165,15 +220,44 @@ public class Int32InstanceSymbol : ClassInstanceSymbol
         if (right is not Int32InstanceSymbol)
             throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
         
-        return expression.Operator switch
-        {
-            "+" => Native.Int32Class,
-            "-" => Native.Int32Class,
-            "*" => Native.Int32Class,
-            "/" => Native.Float32Class,
-            "==" => Native.BoolClass,
-          _ =>  throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position)
-        };
+        if (binaryOperators.TryGetValue(expression.Operator, out var res))
+            return res.Item2;
+
+        throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public override void CompileUnaryOperation(UnaryExpression expression, Compiler compiler)
+    {
+        var expr = expression.Right;
+        
+        compiler.CompileExpression(expr);
+        compiler.Emit(unaryOperators[expression.Operator].Item1);
+    }
+
+    public override ClassSymbol VisitUnary(UnaryExpression expression)
+    {        
+        if (unaryOperators.TryGetValue(expression.Operator, out var res))
+            return res.Item2;
+
+        throw new NotSupportedOperandsError(GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public override void VisitEquatingOperator(
+        VarAssignmentStatement statement, Analyzer analyzer, Scope scope, ClassInstanceSymbol right)
+    {
+        if (right.Type != Type)
+            throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), statement.Position);
+    }
+
+    public override void CompileEquatingOperator(
+        VarAssignmentStatement statement, Compiler compiler)
+    {
+        ArgumentNullException.ThrowIfNull(statement.ResolvedValue);
+        ArgumentNullException.ThrowIfNull(statement.Resolved);
+
+        compiler.Emit(statement.Resolved.GetPushBytes(null));
+        compiler.CompileExpression(statement.Value);
+        compiler.Emit(binaryOperators[statement.Operator.Replace("=", "")].Item1);
     }
 }
 
@@ -195,11 +279,79 @@ public class BoolInstanceSymbol : ClassInstanceSymbol
 
         if (Value != null)
             analyzer.ConstantPool.Add(new BoolConstant(Value.GetValueOrDefault()));
+
+        binaryOperators = new()
+        {
+            {"!=", (OpCode.BOOL_NEQ, analyzer.Native.BoolClass)},
+            {"==", (OpCode.BOOL_EQ, analyzer.Native.BoolClass)},
+            {"and", (OpCode.BOOL_AND, analyzer.Native.BoolClass)},
+            {"or", (OpCode.BOOL_OR, analyzer.Native.BoolClass)},
+        };
+
+        unaryOperators = new()
+        {
+            {"not", (OpCode.BOOL_NOT, analyzer.Native.BoolClass)},
+        };
     }
 
     public override byte[] GetPushBytes(IdentifierExpressionPart? idPart)
     {
         return [(byte)OpCode.PUSH_CONSTANT, 
             ..BitConverter.GetBytes(analyzer.ConstantPool.Add(new BoolConstant(Value ?? throw new ArgumentNullException())))];
+    }
+
+    public override void CompileBinaryOperation(BinaryExpression expression, Compiler compiler)
+    {
+        var lintExpr = expression.Left;
+        var rintExpr = expression.Right;
+        
+        compiler.CompileExpression(lintExpr);
+        compiler.CompileExpression(rintExpr);
+        compiler.Emit(binaryOperators[expression.Operator].Item1);
+    }
+
+    public override ClassSymbol VisitBinary(ClassInstanceSymbol right, BinaryExpression expression)
+    {
+        if (right is not BoolInstanceSymbol)
+            throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
+        
+        if (binaryOperators.TryGetValue(expression.Operator, out var res))
+            return res.Item2;
+
+        throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public override void CompileUnaryOperation(UnaryExpression expression, Compiler compiler)
+    {
+        var expr = expression.Right;
+        
+        compiler.CompileExpression(expr);
+        compiler.Emit(unaryOperators[expression.Operator].Item1);
+    }
+
+    public override ClassSymbol VisitUnary(UnaryExpression expression)
+    {        
+        if (unaryOperators.TryGetValue(expression.Operator, out var res))
+            return res.Item2;
+
+        throw new NotSupportedOperandsError(GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public override void VisitEquatingOperator(
+        VarAssignmentStatement statement, Analyzer analyzer, Scope scope, ClassInstanceSymbol right)
+    {
+        if (right.Type != Type)
+            throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), statement.Position);
+    }
+
+    public override void CompileEquatingOperator(
+        VarAssignmentStatement statement, Compiler compiler)
+    {
+        ArgumentNullException.ThrowIfNull(statement.ResolvedValue);
+        ArgumentNullException.ThrowIfNull(statement.Resolved);
+
+        compiler.Emit(statement.Resolved.GetPushBytes(null));
+        compiler.CompileExpression(statement.Value);
+        compiler.Emit(binaryOperators[statement.Operator.Replace("=", "")].Item1);
     }
 }

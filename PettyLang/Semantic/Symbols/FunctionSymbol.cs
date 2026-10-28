@@ -8,22 +8,22 @@ public class BasicConstructorSymbol : ConstructorFunctionSymbol
 {
     public readonly FunctionOverload Overload;
 
-    private void getOvBytes(Compiler Compiler)
+    private void getOvBytes(Compiler compiler)
     {
         for (int i = 0; i < Class.VarDefines.Count; i++)
         {
             var var = Class.VarDefines[i];
-            if (var.Value == null) continue;
-            Compiler.CompileExpression(var.Value);
-            Compiler.Emit(OpCode.LOAD_LOCAL);
-            Compiler.Emit(0);
-            Compiler.Emit(OpCode.STORE_FIELD);
-            Compiler.Emit(var.Resolved.ID);
+            if (var.Value == null) compiler.Emit(var.Resolved.Type.GetDefaultValueBytes(compiler, var.Position));
+            else compiler.CompileExpression(var.Value);
+            compiler.Emit(OpCode.LOAD_LOCAL);
+            compiler.Emit(0);
+            compiler.Emit(OpCode.STORE_FIELD);
+            compiler.Emit(var.Resolved.ID);
         }
 
-        Compiler.Emit(OpCode.LOAD_LOCAL);
-        Compiler.Emit(0);
-        Compiler.Emit(OpCode.RET);
+        compiler.Emit(OpCode.LOAD_LOCAL);
+        compiler.Emit(0);
+        compiler.Emit(OpCode.RET);
     }
     public BasicConstructorSymbol(ClassSymbol klass, Analyzer analyzer) : base(klass, true, analyzer, null)
     {

@@ -1,5 +1,6 @@
 using PettyLang.AST;
 using PettyLang.Errors;
+using PettyLang.Compiler;
 
 namespace PettyLang.Semantic;
 
@@ -32,6 +33,16 @@ public abstract class Symbol
         throw new NotSupportedOperandsError(GetFullName(), instance.GetFullName(), expression.Operator, expression.Position);
     }
 
+    public virtual void CompileUnaryOperation(UnaryExpression expression, Compiler.Compiler compiler)
+    {
+        throw new NotSupportedOperandsError(GetFullName(), expression.Operator, expression.Position);
+    }
+
+    public virtual ClassSymbol VisitUnary(UnaryExpression expression)
+    {
+        throw new NotSupportedOperandsError(GetFullName(), expression.Operator, expression.Position);
+    }
+
     public virtual ClassSymbol ResolveCall(FunctionParameter[] arguments, IdentifierExpression id, IdentifierExpressionPart part)
     {
         throw new NotCallableError(GetFullName(), part.Position);
@@ -62,6 +73,19 @@ public abstract class Symbol
     public virtual byte[] GetPushBytes(IdentifierExpressionPart? idPart)
     {
         throw new NotSupportedException($"Cannot push '{GetFullName()}'");
+    }
+
+    public virtual void VisitEquatingOperator
+        (VarAssignmentStatement statement, Analyzer analyzer, Scope scope, ClassInstanceSymbol right)
+    {
+        throw new NotSupportedOperandsError(GetFullName(), right.GetFullName(), statement.Position);
+    }
+
+    public virtual void CompileEquatingOperator
+        (VarAssignmentStatement statement, Compiler.Compiler compiler)
+    {
+        ArgumentNullException.ThrowIfNull(statement.ResolvedValue);
+        throw new NotSupportedOperandsError(GetFullName(), statement.ResolvedValue.GetFullName(), statement.Position);
     }
 
     public virtual string GetFullName()

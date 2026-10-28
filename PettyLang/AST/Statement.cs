@@ -24,6 +24,7 @@ public class VarAssignmentStatement(Position position, IdentifierExpression targ
     public readonly Expression Value = value;
 
     public VarSymbol? Resolved = null;
+    public ClassInstanceSymbol? ResolvedValue = null;
 }
 
 public class BlockStatement(Position position, Statement[] statements) : Statement(position)

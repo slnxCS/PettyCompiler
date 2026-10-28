@@ -39,8 +39,6 @@ public enum OpCode : byte
     JMP_IF_FALSE = 26,
     JMP_IF_TRUE = 27,
     JMP = 28,
-    INT_EQ = 29,
-
     ALLOCATE_OBJ = 25,
     CALL_METHOD = 30,
     LOAD_FIELD = 31,
@@ -48,6 +46,28 @@ public enum OpCode : byte
     ALLOCATE_ARR = 35,
     ARR_GET = 36,
     ARR_SET = 37,
+
+    INT_EQ = 29,
+    INT_NEQ = 38,
+    INT_NEG = 39,
+    INT_LEQ = 40,
+    INT_GEQ = 41,
+    INT_LE = 42,
+    INT_GE = 43,
+
+    FLOAT_EQ = 44,
+    FLOAT_LEQ = 45,
+    FLOAT_GEQ = 46,
+    FLOAT_LE = 47,
+    FLOAT_GE = 48,
+    FLOAT_NEQ = 54,
+    FLOAT_NEG = 55,
+
+    BOOL_EQ = 49,
+    BOOL_NOT = 50,
+    BOOL_AND = 51,
+    BOOL_OR = 52,
+    BOOL_NEQ = 53,
 }
 
 public class Compiler

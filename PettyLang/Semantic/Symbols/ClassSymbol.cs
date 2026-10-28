@@ -73,6 +73,16 @@ public class ArrayClassSymbol : ClassSymbol
     {
         return new ArrayInstanceSymbol(scope, position, analyzer);
     }
+
+    public override ArrayInstanceSymbol ResolveDefaultValue(Analyzer analyzer, Position position, Scope scope)
+    {
+        return new ArrayInstanceSymbol(scope, position, analyzer);
+    }
+
+    public override byte[] GetDefaultValueBytes(Compiler compiler, Position position)
+    {
+        return [.. BitConverter.GetBytes(0), (byte)OpCode.ALLOCATE_ARR];
+    }
 }
 
 public class Int32ClassSymbol : ClassSymbol
