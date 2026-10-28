@@ -384,9 +384,10 @@ public class Analyzer
             ov.LocalsCount = currentScope.GetFreeVarID();
             currentScope = lastScope;
             currentFunction = oldFunc;
-            if (!returnFinded && ov.ReturnType != Native.VoidClass) 
-                throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", ov.Position);
         }
+
+        if (!returnFinded && ov.ReturnType != Native.VoidClass) 
+                throw new Error($"Function '{ov.Parent.GetFullName()}' : not all code paths return a value", "", ov.Position);
     }
 
     void VisitVarDef(VarDeclStatement varDecl)
