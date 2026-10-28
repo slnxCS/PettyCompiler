@@ -1,0 +1,47 @@
+class Vector : {
+    var X : int32 = 0;
+    var Y : int32 = 0;
+
+    func PrintSelf() : {
+        print(self.X);
+        print(self.Y);
+    }
+
+    func Add(other : Vector) : Vector {
+        var res = Vector();
+        res.X = self.X + other.X;
+        res.Y = self.Y + other.Y;
+        return res;
+    }
+}
+
+func print(vector : Vector) : {
+    vector.PrintSelf();
+}
+
+func Main() : {
+    var vec1 = Vector();
+    var vec2 = Vector();
+
+    vec1.X = 10;
+    vec1.Y = 20;
+    vec2.X = 30;
+    vec2.Y = 40;
+
+    print(vec1);
+    print(vec2);
+
+    var vec3 = vec1.Add(vec2);
+
+    print(vec3);
+
+    #<
+    Output : 
+        10
+        20
+        30
+        40
+        40
+        60
+    >#
+}

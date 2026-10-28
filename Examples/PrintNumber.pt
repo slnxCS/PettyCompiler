@@ -1,0 +1,3 @@
+func Main() : {
+    print(10);
+}

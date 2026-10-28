@@ -1,5 +1,4 @@
-﻿using PettyLang.AST;
-using PettyLang.Compiler;
+﻿using PettyLang.Compiler;
 using PettyLang.Errors;
 using PettyLang.Semantic;
 using System.CommandLine;
@@ -68,8 +67,17 @@ public class Program
                 new HelpAction().Invoke(res);
                 return;
             }
+            
+            string src;
 
-            var src = await GetFileText(path);
+            try { src = await GetFileText(path); }
+            catch(FileNotFoundException) 
+            { 
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"File '{path}' does not exist. Terminating compiler..."); 
+                Console.ResetColor();
+                return; 
+            }
 
             byte[] compiled;
 
