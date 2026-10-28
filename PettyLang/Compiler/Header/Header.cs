@@ -4,7 +4,7 @@ namespace PettyLang.Compiler;
 
 public class HeaderCompiler
 {
-    public const float BYTECODE_VERSION = 1.391f;
+    public const float BYTECODE_VERSION = 1.392f;
 
     public static readonly byte[] MAGIC = Encoding.ASCII.GetBytes("[PTVM]");
 

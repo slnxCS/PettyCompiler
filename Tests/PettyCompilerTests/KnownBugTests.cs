@@ -29,7 +29,6 @@ public class KnownBugTests
             "PUSH_CONSTANT 2",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -50,7 +49,6 @@ public class KnownBugTests
             "PUSH_CONSTANT 1",
             "STORE_LOCAL 0",
             "RET",
-            "HALT",
         }));
     }
 

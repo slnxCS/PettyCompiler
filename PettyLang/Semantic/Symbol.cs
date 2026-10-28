@@ -505,7 +505,6 @@ public class MethodSymbol : FunctionSymbol
             throw new ArgumentNullException(nameof(part.ResolvedOverload));
 
         var ov = part.ResolvedOverload;
-        
         return [(byte)OpCode.CALL_METHOD, .. BitConverter.GetBytes(ov.ID), .. BitConverter.GetBytes(ov.Arity)];
     }
 

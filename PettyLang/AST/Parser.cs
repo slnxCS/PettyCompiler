@@ -48,14 +48,27 @@ public class Parser
         throw new Error(message, "Syntax", current.Position);
     }
 
-    private BlockStatement parseBlock()
+    private BlockStatement parseBlock(bool canOneLine)
     {
-        var startPos = consume(TokenType.LCurlyBrace, "Expected '{' before block").Position.Start;
+        Point2D startPos;
+        bool isMultyLine = match(TokenType.LCurlyBrace);
+
+        if (!isMultyLine && !canOneLine) 
+            throw new Error("Expected '{' for start block", "Syntax", last.Position);
+        
+        startPos = (isMultyLine ? last : current).Position.Start;
         var statements = new List<Statement>();
-        while (!match(TokenType.RCurlyBrace)) 
+        if (isMultyLine) 
+        {
+            while (!match(TokenType.RCurlyBrace)) 
+            {
+                statements.Add(parseStatement());
+                if (isEnd) throw new Error("Expected '}'", "Syntax", current.Position);
+            }
+        }
+        else
         {
             statements.Add(parseStatement());
-            if (isEnd) throw new Error("Expected '}'", "Syntax", current.Position);
         }
         var endPos = last.Position.End;
 
@@ -100,7 +113,7 @@ public class Parser
 
         if (retType != null) endPos = retType.Position.End;
 
-        var block = parseBlock();
+        var block = parseBlock(false);
 
         return new(new(startPos, endPos), name, parameters, retType, block);
     }
@@ -128,7 +141,7 @@ public class Parser
         var condition = parseExpression();
         var endPos = consume(TokenType.Colon, "Expected ':' after expression").Position.End;
         var pos = new Position(startPos, endPos);
-        var block = parseBlock();
+        var block = parseBlock(true);
         return new(condition, block, pos);
     }
 
@@ -144,7 +157,7 @@ public class Parser
             endPos = derivedName.Position.End;
         }
 
-        var block = parseBlock();
+        var block = parseBlock(false);
 
         return new (new(startPos, endPos), name, block, derivedName);
     }
@@ -161,7 +174,7 @@ public class Parser
                 return new StatementExpression(id);
             }
             case TokenType.Var : return parseVarAssign();
-            case TokenType.LCurlyBrace : return parseBlock();
+            case TokenType.LCurlyBrace : return parseBlock(false);
             case TokenType.Func : return parseFuncDef();
             case TokenType.Class : return parseClass();
             case TokenType.Return : return parseReturn();

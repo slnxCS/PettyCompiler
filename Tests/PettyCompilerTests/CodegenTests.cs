@@ -21,10 +21,28 @@ public class CodegenTests
         var bc = Compile("func Main() { }");
         Assert.That(bc.Constants, Is.Empty);
         Assert.That(bc.Functions, Has.Count.EqualTo(1));
-        Assert.That(bc.Listing(bc.Functions[0]), Is.EqualTo(new[] {"RESERVE_LOCALS 0", "RET", "HALT"}));
+        Assert.That(bc.Listing(bc.Functions[0]), Is.EqualTo(new[] {"RESERVE_LOCALS 0", "RET"}));
         Assert.That(bc.GlobalCount, Is.EqualTo(0));
         Assert.That(bc.Listing(bc.GlobalInit), Is.EqualTo(new[] {"HALT"}));
         Assert.That(bc.Listing(bc.Entry), Is.EqualTo(new[] {"CALL 0 0", "HALT"}));
+    }
+
+    [Test]
+    public void FunctionLengthPrefix()
+    {
+        // magic(6) + version(4) + constCount(4) + funcCount(4), then Main: length, RESERVE_LOCALS 0, RET
+        var bytes = Bytes("func Main() { }");
+        Assert.That(BitConverter.ToInt32(bytes, 18), Is.EqualTo(6));
+        Assert.That(bytes[22], Is.EqualTo((byte)OpCode.RESERVE_LOCALS));
+        Assert.That(bytes[27], Is.EqualTo((byte)OpCode.RET));
+    }
+
+    [Test]
+    public void FunctionsHaveNoTrailingHalt()
+    {
+        var bc = Compile("class A : { func m() { } } func f() { } func Main() { var a = A(); }");
+        var bodies = bc.Functions.Concat(bc.Classes.SelectMany(x => x.Methods));
+        Assert.That(bodies.SelectMany(x => x).Select(x => x.Op), Has.None.EqualTo(OpCode.HALT));
     }
 
     [Test]
@@ -41,7 +59,7 @@ public class CodegenTests
         var bc = Compile("func a() { print(1); } func b() { print(2); } func Main() { b(); a(); }");
         Assert.That(bc.Listing(bc.Functions[0]), Does.Contain("PUSH_CONSTANT 1"));
         Assert.That(bc.Listing(bc.Functions[1]), Does.Contain("PUSH_CONSTANT 2"));
-        Assert.That(bc.Listing(bc.Main), Is.EqualTo(new[] {"RESERVE_LOCALS 0", "CALL 1 0", "CALL 0 0", "RET", "HALT"}));
+        Assert.That(bc.Listing(bc.Main), Is.EqualTo(new[] {"RESERVE_LOCALS 0", "CALL 1 0", "CALL 0 0", "RET"}));
     }
 
     [Test]
@@ -92,7 +110,6 @@ public class CodegenTests
             "LOAD_LOCAL 0",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -109,7 +126,6 @@ public class CodegenTests
             "ADD_INT",
             "STORE_LOCAL 0",
             "RET",
-            "HALT",
         }));
     }
 
@@ -132,7 +148,6 @@ public class CodegenTests
             "LOAD_LOCAL 0",
             "STORE_LOCAL 2",
             "RET",
-            "HALT",
         }));
     }
 
@@ -159,7 +174,6 @@ public class CodegenTests
             "LOAD_GLOBAL 1",
             "SYS_CALL 2 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -180,7 +194,6 @@ public class CodegenTests
             opcode,
             "STORE_LOCAL 0",
             "RET",
-            "HALT",
         }));
     }
 
@@ -201,7 +214,6 @@ public class CodegenTests
             opcode,
             "STORE_LOCAL 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -220,7 +232,6 @@ public class CodegenTests
             "SUB_INT",
             "STORE_LOCAL 0",
             "RET",
-            "HALT",
         }));
     }
 
@@ -235,7 +246,6 @@ public class CodegenTests
             "CAST_FROM_FLOAT32_TO_INT32",
             "STORE_LOCAL 0",
             "RET",
-            "HALT",
         }));
     }
 
@@ -271,7 +281,6 @@ public class CodegenTests
             "SYS_CALL 5 2",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -287,7 +296,6 @@ public class CodegenTests
             "ADD_INT",
             "RET",
             "RET",
-            "HALT",
         }));
         Assert.That(bc.Listing(bc.Main), Is.EqualTo(new[]
         {
@@ -297,7 +305,6 @@ public class CodegenTests
             "CALL 0 2",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -343,7 +350,6 @@ public class CodegenTests
             "PUSH_CONSTANT 1",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -362,8 +368,14 @@ public class CodegenTests
             "PUSH_CONSTANT 2",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
+    }
+
+    [Test]
+    public void IfWithoutBracesCompilesLikeIfWithBraces()
+    {
+        Assert.That(Bytes(InMain("var x = 1; if x == 1 : print(x); print(2);")),
+            Is.EqualTo(Bytes(InMain("var x = 1; if x == 1 : { print(x); } print(2);"))));
     }
 
     [Test]
@@ -375,7 +387,6 @@ public class CodegenTests
             "PUSH_CONSTANT true",
             "JMP_IF_FALSE @3",
             "RET",
-            "HALT",
         }));
     }
 
@@ -404,14 +415,13 @@ public class CodegenTests
             "LOAD_LOCAL 0",
             "RET",
             "RET",
-            "HALT",
         }));
     }
 
     [Test]
     public void EmptyReturn()
     {
-        Assert.That(MainListing(InMain("return;")), Is.EqualTo(new[] {"RESERVE_LOCALS 0", "RET", "RET", "HALT"}));
+        Assert.That(MainListing(InMain("return;")), Is.EqualTo(new[] {"RESERVE_LOCALS 0", "RET", "RET"}));
     }
 
     // ---------- Classes ----------
@@ -486,7 +496,6 @@ public class CodegenTests
             "ADD_INT",
             "RET",
             "RET",
-            "HALT",
         }));
         Assert.That(bc.Listing(methods[1]), Is.EqualTo(new[]
         {
@@ -498,7 +507,6 @@ public class CodegenTests
             "LOAD_LOCAL 0",
             "STORE_FIELD 0",
             "RET",
-            "HALT",
         }));
     }
 
@@ -517,7 +525,6 @@ public class CodegenTests
             "LOAD_LOCAL 0",
             "RET",
             "RET",
-            "HALT",
         }));
     }
 
@@ -540,7 +547,6 @@ public class CodegenTests
             "CALL_METHOD 0 1",
             "SYS_CALL 0 1",
             "RET",
-            "HALT",
         }));
     }
 
@@ -550,7 +556,7 @@ public class CodegenTests
         var bc = Compile("class In : { var v = 1; } class Out : { var i : In; } " +
             "func Main() { var o = Out(); o.i = In(); print(o.i.v); }");
         var listing = bc.Listing(bc.Main);
-        Assert.That(listing[^6..^1], Is.EqualTo(new[] {"LOAD_LOCAL 0", "LOAD_FIELD 0", "LOAD_FIELD 0", "SYS_CALL 0 1", "RET"}));
+        Assert.That(listing[^5..], Is.EqualTo(new[] {"LOAD_LOCAL 0", "LOAD_FIELD 0", "LOAD_FIELD 0", "SYS_CALL 0 1", "RET"}));
     }
 
     // ---------- Whole programs ----------

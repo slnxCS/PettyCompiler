@@ -100,7 +100,7 @@ public class Bytecode
 
         var funcCount = readInt();
         for (int i = 0; i < funcCount; i++)
-            Functions.Add(readCode());
+            Functions.Add(readFunction());
 
         var classCount = readInt();
         for (int i = 0; i < classCount; i++)
@@ -112,7 +112,7 @@ public class Bytecode
             var methodCount = readInt();
             var methods = new List<List<Instruction>>();
             for (int j = 0; j < methodCount; j++)
-                methods.Add(readCode());
+                methods.Add(readFunction());
             Classes.Add(new(name, id, parentId, fieldCount, methods));
         }
 
@@ -141,24 +141,55 @@ public class Bytecode
         };
     }
 
-    // Reads instructions up to and including HALT
+    // Reads a function or method: i32 body length, then exactly that many bytes of instructions,
+    // starting with RESERVE_LOCALS and ending with RET
+    private List<Instruction> readFunction()
+    {
+        var lengthOffset = position;
+        var length = readInt();
+        var end = position + length;
+        if (length <= 0 || end > bytes.Length)
+            throw new InvalidDataException($"Invalid function length {length} at 0x{lengthOffset:X}");
+
+        var list = new List<Instruction>();
+        while (position < end)
+            list.Add(readInstruction());
+
+        if (position != end)
+            throw new InvalidDataException(
+                $"Function at 0x{lengthOffset:X} has length {length}, but its last instruction ends at 0x{position:X}");
+        if (list[0].Op != OpCode.RESERVE_LOCALS)
+            throw new InvalidDataException($"Function at 0x{lengthOffset:X} must start with RESERVE_LOCALS, not {list[0].Op}");
+        if (list[^1].Op != OpCode.RET)
+            throw new InvalidDataException($"Function at 0x{lengthOffset:X} must end with RET, not {list[^1].Op}");
+
+        return list;
+    }
+
+    // Reads instructions up to and including HALT (globals and entry sections)
     private List<Instruction> readCode()
     {
         var list = new List<Instruction>();
         while (true)
         {
-            var offset = position;
-            var op = (OpCode)take(1)[0];
-            if (!operandCounts.TryGetValue(op, out var count))
-                throw new InvalidDataException($"Unknown opcode {(byte)op} at 0x{offset:X}");
-
-            var operands = new int[count];
-            for (int i = 0; i < count; i++)
-                operands[i] = readInt();
-
-            list.Add(new(offset, op, operands));
-            if (op == OpCode.HALT) return list;
+            var instruction = readInstruction();
+            list.Add(instruction);
+            if (instruction.Op == OpCode.HALT) return list;
         }
+    }
+
+    private Instruction readInstruction()
+    {
+        var offset = position;
+        var op = (OpCode)take(1)[0];
+        if (!operandCounts.TryGetValue(op, out var count))
+            throw new InvalidDataException($"Unknown opcode {(byte)op} at 0x{offset:X}");
+
+        var operands = new int[count];
+        for (int i = 0; i < count; i++)
+            operands[i] = readInt();
+
+        return new(offset, op, operands);
     }
 
     private int readInt() => BitConverter.ToInt32(take(4));

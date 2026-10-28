@@ -5,24 +5,28 @@
 Компилятор — классический многопроходный конвейер. Каждый этап — отдельный класс; данные между этапами
 передаются через массив токенов, AST и аннотации, которые семантический анализатор записывает прямо в узлы AST.
 
+Весь конвейер собран в `Program.Start(string sourceCode) : byte[]`. Его же вызывают тесты.
+
 ```
-Program.Main
- │
- ├─ new Parser(source)            Parser.cs        ← внутри вызывает Lexer.Tokenize()
- │     └─ Lexer.Tokenize()        Lexer.cs         → Token[]
- ├─ parser.Parse()                                 → Statement[] (AST)
- ├─ new Analyzer().Analyze(AST)   Analyzer.cs      → аннотированный AST + списки функций/классов/глобалов
- │                                                   + заполненный ConstantPool
- ├─ new CompileFabric(AST)        ComileFabric.cs
- │     .Build(analyzer)
- │       └─ new Compiler(AST, analyzer)
- │            .Compile(new HeaderCompiler())       → byte[]
- └─ File.WriteAllBytes("compiled.pt", bytes)
+Program.Main                      разбор командной строки (System.CommandLine)
+ └─ Program.Start(source)
+     ├─ new Parser(source)            Parser.cs       ← внутри вызывает Lexer.Tokenize()
+     │     └─ Lexer.Tokenize()        Lexer.cs        → Token[]
+     ├─ parser.Parse()                                → Statement[] (AST)
+     ├─ new ConstantPool()            ConstantPool.cs
+     ├─ new Analyzer(constantPool)    Analyzer.cs     ← создаёт Native (встроенные типы и функции)
+     ├─ analyzer.Analyze(AST)                         → аннотированный AST + списки функций/классов/глобалов
+     │                                                  + заполненный пул констант
+     └─ new CompileFabric(AST)        CompileFabric.cs
+           .Build(analyzer)
+             └─ new Compiler(AST, analyzer)
+                  .Compile(new HeaderCompiler())      → byte[]
+ └─ File.WriteAllBytesAsync(<-o>, bytes)
 ```
 
 | Пространство имён | Содержимое |
 |---|---|
-| `PettyLang` | `Program`, `Point2D`, `Position`, `BuiltIn` |
+| `PettyLang` | `Program`, `Point2D`, `Position`, `Native` |
 | `PettyLang.Errors` | `Error` и производные |
 | `PettyLang.Tokens` | `TokenType`, `Token` |
 | `PettyLang.Lexer` | `Lexer` |
@@ -31,19 +35,19 @@ Program.Main
 | `PettyLang.Semantic` | `Analyzer`, `Scope`, символы |
 | `PettyLang.Compiler` | `CompileFabric`, `Compiler`, `OpCode`, `ConstantPool`, `HeaderCompiler` |
 
-### Глобальное состояние
+### Состояние компиляции
 
-Ряд данных хранится в **статических** полях и не сбрасывается между запусками:
+Глобального статического состояния нет. Всё, что относится к одной компиляции, принадлежит её объектам:
 
-| Поле | Где | Что хранит |
-|---|---|---|
-| `BuiltIn.GlobalScope` и все `BuiltIn.*Class` | `Builtin.cs` | глобальная область видимости, встроенные типы |
-| `Scope.GlobalFreeIDSet` | `Scope.cs` | счётчики ID глобальных переменных, функций, классов |
-| `ConstantPool.constants/lookup` | `ConstantPool.cs` | пул констант |
-| `Analyzer.MainFunction`, `Analyzer.Current` | `Analyzer.cs` | точка входа, текущий анализатор |
+| Что | Владелец |
+|---|---|
+| встроенные типы и функции, глобальная область видимости | `Native` — создаётся в конструкторе `Analyzer` |
+| пул констант | `ConstantPool` — передаётся в конструктор `Analyzer`, доступен как `analyzer.ConstantPool` |
+| счётчики ID глобальных переменных, функций и классов | `IDSet` глобальной области (`Native.GlobalScope`) |
+| точка входа, списки функций/методов/классов/глобалов | поля `Analyzer` |
 
-Следствие: **в одном процессе можно корректно скомпилировать только одну программу.** Это важно для тестов
-и для возможного встраивания компилятора (см. [известные проблемы](06-known-issues.md)).
+Поэтому в одном процессе можно скомпилировать сколько угодно программ, и результаты не влияют друг на друга
+(это проверяет тест `CodegenTests.CompilationIsDeterministic`).
 
 ## 2. Позиции и ошибки
 
@@ -76,6 +80,9 @@ class Error(string message, string errorType, Position position) : Exception
 Помимо `Error`, на нереализованных путях выбрасываются системные исключения `NotImplementedException`,
 `NullReferenceException`, `NotSupportedException` — их нужно воспринимать как «конструкция пока не
 поддерживается». Компилятор останавливается на **первой** ошибке; восстановления после ошибок нет.
+
+`Program.Main` без опции `-d` перехватывает `Error` и прочие исключения и печатает их; с `-d` пропускает
+наружу (см. [01 — Быстрый старт](01-getting-started.md#сообщения-об-ошибках)).
 
 ## 3. Лексер (`Lexer/Lexer.cs`)
 
@@ -132,15 +139,18 @@ public class Token(string lexeme, TokenType type, Position position)
 |---|---|
 | `Parse()` | `program` |
 | `parseStatement()` | `statement`: выбор по типу текущего токена (`Identifier`, `Var`, `{`, `Func`, `Class`, `Return`, `If`) |
-| `parseBlock()` | `block` |
+| `parseBlock(canOneLine)` | `block` / `ifBody`: если текущий токен `{` — инструкции до `}`; иначе при `canOneLine` — ровно одна инструкция, без него — ошибка `Expected '{' for start block` |
 | `parseVarAssign()` | `varDecl` (несмотря на имя, разбирает объявление) |
-| `parseVarAssigment(target)` | присваивание после уже разобранного `path` |
+| `parseVarAssignment(target)` | присваивание после уже разобранного `path` |
 | `parseFuncDef()`, `parseParameters()`, `parseParameter()` | `funcDef`, `param` |
 | `parseClass()` | `classDef` |
 | `parseReturn()` | `returnStmt` |
 | `parseIf()` | `ifStmt` |
 | `parseExpression()` → `parseEquals()` → `parseAdditive()` → `parseMultiplicative()` → `parseAsExpression()` → `parsePrimaryBasicExpression()` | каскад приоритетов |
 | `parseIdentifier()` / `parseIdentifierPart()` / `ParseFuncCalls()` / `parseFuncCall()` | `path`, `pathPart`, списки аргументов |
+
+`parseBlock(true)` вызывается только для тела `if`; тела функций, классов и блок `{ … }` как инструкция
+разбираются через `parseBlock(false)` и требуют фигурных скобок.
 
 Полная грамматика — в [02 — Справочник языка](02-language.md#2-грамматика).
 
@@ -158,12 +168,14 @@ public class Token(string lexeme, TokenType type, Position position)
 |---|---|---|
 | `StatementExpression` | `Expression` | — |
 | `VarDeclStatement` | `Name`, `Type?` (`IdentifierExpression`), `Value?` | `Resolved : VarSymbol` |
-| `VarAssigmentStatement` | `Target` (`IdentifierExpression`), `Operator`, `Value` | `Resolved : VarSymbol?` |
+| `VarAssignmentStatement` | `Target` (`IdentifierExpression`), `Operator`, `Value` | `Resolved : VarSymbol?` |
 | `BlockStatement` | `Statements[]` | — |
 | `FuncDefineStatement` | `Name`, `Parameters[]` (`FuncParameter`), `ReturnType?`, `Block` | `Resolved : FunctionOverload?` |
 | `ClassDefineStatement` | `Name`, `Block?`, `Derived?` | `Resolved : ClassSymbol?` |
 | `ReturnStatement` | `Value?` | — |
 | `IfStatement` | `Condition`, `Block` | — |
+
+Тело `if` без скобок тоже представлено `BlockStatement` — с одной инструкцией.
 
 `FuncParameter` (параметр в AST) — не узел, а простой класс: `Name`, `Type`, `Resolved : FunctionParameter?`.
 
@@ -193,7 +205,7 @@ IdentifierExpression
 ```
 
 Каждая часть знает родителя (`Parent`) и свой индекс; `Last()` возвращает предыдущую часть.
-Поля `ArrayAppealArgumentsBeforeFuncCall/AftersFuncCall` зарезервированы под индексаторы `a[i]` и сейчас
+Поля `ArrayAppealArgumentsBeforeFuncCall/AfterFuncCall` зарезервированы под индексаторы `a[i]` и сейчас
 всегда `null`.
 
 ## 6. Семантический анализ
@@ -208,9 +220,13 @@ enum ScopeType { Global, Function, Class, Instance, Package, Local }
 Поиск (`GetVar/GetFunc/GetClass(name, local)`) идёт вверх по цепочке родителей, если `local == false`.
 `Define*` проверяет конфликт только в текущей области (это даёт shadowing во вложенных блоках).
 
-| Тип области | Где создаётся | Набор счётчиков ID (`IDSet`) | `Self` |
+У каждой области есть ссылка на `IDSet` своей глобальной области (`GlobalFreeIDSet`): глобальная область
+создаёт новый набор, а все остальные берут его у родителя. Так счётчики общие в пределах одной компиляции и
+независимы между компиляциями.
+
+| Тип области | Где создаётся | Собственный набор счётчиков (`freeIDSet`) | `Self` |
 |---|---|---|---|
-| `Global` | `BuiltIn.GlobalScope` | статический `GlobalFreeIDSet` | — |
+| `Global` | `Native.GlobalScope` | совпадает с глобальным набором | — |
 | `Function` | `VisitFuncBlock` — тело функции/метода | новый | — |
 | `Local` | `VisitBlock`, `VisitIf` | **общий с родителем** | — |
 | `Class` | `ClassSymbol` — статические члены класса | новый | — |
@@ -219,17 +235,17 @@ enum ScopeType { Global, Function, Class, Instance, Package, Local }
 
 Выдача ID:
 
-- `GetFreeVarID()` — следующий номер переменной в текущем `IDSet`. Поскольку `Local` разделяет набор
+- `GetFreeVarID()` — следующий номер переменной в `freeIDSet`. Поскольку `Local` разделяет набор
   с родительской `Function`, все локальные переменные функции (включая параметры и переменные вложенных
   блоков) нумеруются сквозным образом `0..N-1`, и `N` становится `LocalsCount` функции.
 - `GetFreeFuncID()` — для областей `Global/Function/Local/Package` берёт **глобальный** счётчик функций;
-  для `Class/Instance` — счётчик класса. Поэтому у функций верхнего уровня сквозная нумерация, а у методов —
-  собственная внутри каждого класса.
-- `GetFreeClassID()` — `ClassSymbol` всегда вызывает его у `BuiltIn.GlobalScope`, так что ID классов глобальны.
+  для `Class/Instance` — собственный счётчик. Поэтому у функций верхнего уровня сквозная нумерация, а у методов —
+  своя внутри каждого класса.
+- `GetFreeClassID()` — `ClassSymbol` всегда вызывает его у `Native.GlobalScope`, так что ID классов сквозные.
 
-`CopyFromClass(ClassSymbol)` наполняет `Instance`-область: создаёт `MethodSymbol` для каждой функции класса
-(разделяя с ним объекты `FunctionOverload`), копирует вложенные классы и вызывает
-`Analyzer.ResolveFieldsDecl` — так каждый экземпляр получает собственные `VarSymbol` полей с ID `0..K-1`.
+`CopyFromClass(ClassSymbol, Analyzer)` наполняет `Instance`-область: создаёт `MethodSymbol` для каждой функции
+класса (разделяя с ним объекты `FunctionOverload`), копирует вложенные классы и вызывает
+`analyzer.ResolveFieldsDecl` — так каждый экземпляр получает собственные `VarSymbol` полей с ID `0..K-1`.
 
 ### 6.2. Символы (`Semantic/Symbol.cs`)
 
@@ -239,12 +255,12 @@ enum ScopeType { Global, Function, Class, Instance, Package, Local }
 ```
 Symbol (abstract)
 ├── VarSymbol                     переменная/параметр/поле: Value → ClassInstanceSymbol
-├── ClassSymbol                   тип; Members = Class-scope; Derived; VarDefines; конструкторы
+├── ClassSymbol                   тип; Members = Class-scope; Derived; VarDefines; конструкторы; Native
 │   ├── Int32ClassSymbol          "int32"
 │   ├── Float32ClassSymbol        "float32"
 │   ├── BoolClassSymbol           "bool"
 │   └── ArrayClassSymbol          "Array"
-└── ClassInstanceSymbol           значение типа; Members = Instance-scope
+└── ClassInstanceSymbol           значение типа; Members = Instance-scope; Native, analyzer
     ├── Int32InstanceSymbol       Value: int?   (константа, если задано)
     ├── Float32InstanceSymbol     Value: float?
     ├── BoolInstanceSymbol        Value: bool?
@@ -263,6 +279,14 @@ FunctionParameter                 Name, Position, Type
 Общие поля `Symbol`: `Name`, `ID`, `Type` (для `ClassSymbol` — он сам), `DeclaredIn` (область), `Position`,
 `Members` (область членов или `null`).
 
+**Доступ к встроенным типам и пулу констант.** Символы не используют глобальных объектов:
+
+- `ClassSymbol` получает `Native` в конструкторе и хранит его в поле `Native`;
+- `ClassInstanceSymbol` (и все наследники, включая функции) получает `Analyzer` в конструкторе, хранит его в
+  поле `analyzer`, а `Native` берёт у своего класса (`@class.Native`);
+- `FunctionSymbol`, `MethodSymbol`, `ArrayConstructorFunctionSymbol` дополнительно принимают `Native` явно:
+  они создаются и внутри конструктора `Native`, когда `analyzer.Native` ещё не присвоен.
+
 Виртуальные методы `Symbol` и их роль:
 
 | Метод | Этап | Назначение |
@@ -280,7 +304,7 @@ FunctionParameter                 Name, Position, Type
 `LOAD_GLOBAL id` / `LOAD_LOCAL id`.
 
 Литеральные экземпляры (`Int32InstanceSymbol` и т. п. с `Value != null`) **при создании добавляют своё
-значение в `ConstantPool`**; их `GetPushBytes` возвращает `PUSH_CONSTANT <индекс>`.
+значение в `analyzer.ConstantPool`**; их `GetPushBytes` возвращает `PUSH_CONSTANT <индекс>`.
 
 #### Перегрузки
 
@@ -299,19 +323,25 @@ FunctionParameter                 Name, Position, Type
 1. Лениво создаётся `BasicConstructorSymbol`: перегрузка `(self : C) : C` с `LocalsCount = 1`, телом
    из `EmitBytes` — для каждого поля с инициализатором `<value>; LOAD_LOCAL 0; STORE_FIELD id`, затем
    `LOAD_LOCAL 0; RET`. Он регистрируется в `Members` класса под именем класса и добавляется в
-   `Analyzer.Methods[C]`.
+   `analyzer.Methods[C]`.
 2. Если у класса нет `Constructor`, лениво создаётся автоконструктор (`IsAutoGenerated = true`) с той же сигнатурой.
 3. Выбирается перегрузка конструктора с аргументами `(self, ...args)`.
 
 `ConstructorFunctionSymbol.GetBytesForCall` генерирует `ALLOCATE_OBJ classId; CALL_METHOD baseCtorId 1`
 (для пользовательского конструктора далее добавился бы вызов самого конструктора).
 
-### 6.3. Встроенные сущности (`Builtin.cs`)
+### 6.3. Встроенные сущности (`Builtin.cs`, класс `Native`)
 
-`BuiltIn.Init()` (идемпотентный) создаёт классы в порядке, определяющем их ID
-(`Object`=0, `ValueObject`=1, `void`=2, `Array`=3, `int32`=4, `float32`=5, `bool`=6, `function`=7),
-описывает встроенные функции с фиксированными ID 0–6 и вызывает `Define()`, который регистрирует всё это
-в `GlobalScope`, а также конструктор `Array`.
+`Native` создаётся в конструкторе `Analyzer` (`new Native(this)`) и содержит:
+
+- `GlobalScope` — глобальную область видимости этой компиляции;
+- встроенные классы в порядке, определяющем их ID:
+  `Object`=0, `ValueObject`=1, `void`=2, `Array`=3, `int32`=4, `float32`=5, `bool`=6, `function`=7;
+- встроенные функции с фиксированными native-ID 0–6 (`print` ×3, `read`, `random`, `get`, `set`);
+- конструктор `Array` (`ArrayConstructorFunctionSymbol`).
+
+Всё это регистрируется в `GlobalScope` в `Native.Define()`. Затем `Analyzer.InitClassList()` добавляет все
+встроенные классы (включая `Array`) в список классов, который попадёт в таблицу классов байткода.
 
 `StringClass` объявлен, но всегда `null` — строковый литерал даёт ошибку с подсказкой про
 `import String from std` (импорт пока не реализован).
@@ -322,7 +352,7 @@ FunctionParameter                 Name, Position, Type
 
 | Поле | Значение |
 |---|---|
-| `currentScope` | текущая область (начинается с `BuiltIn.GlobalScope`) |
+| `currentScope` | текущая область (начинается с `Native.GlobalScope`) |
 | `currentFunction` | анализируемая перегрузка или `null` на верхнем уровне |
 | `currentClass` | анализируемый класс или `null` |
 | `returnFinded` | встречен ли `return` в текущей функции |
@@ -331,27 +361,32 @@ FunctionParameter                 Name, Position, Type
 
 | Поле | Содержимое |
 |---|---|
+| `Native` | встроенные типы и функции этой компиляции |
+| `ConstantPool` | пул констант |
 | `GlobalVariables` | объявления глобальных переменных в порядке объявления |
 | `Functions` | `FuncDefineStatement` функций верхнего уровня (и вложенных в функции) |
 | `Methods` | `ClassSymbol → List<FunctionOverload>`: методы и базовый конструктор каждого класса |
 | `Classes` | `ClassDefineStatement` всех классов, включая синтетические записи для встроенных |
-| `MainFunction` (static) | перегрузка `Main` |
+| `MainFunction` | перегрузка `Main` |
 
 #### Обработка инструкций
 
 | Инструкция | Метод | Что делает |
 |---|---|---|
 | `func` | `ResolveFuncDecl` | находит/создаёт `FunctionSymbol` (или `MethodSymbol`), создаёт `FunctionOverload` (типы параметров и возврата), проверяет правила `Main`, анализирует тело (`VisitFuncBlock`), добавляет в `Functions`/`Methods` |
-| — | `VisitFuncBlock` | новая `Function`-область, параметры объявляются как переменные (ID `0..arity-1`), обход тела, затем `LocalsCount = FreeVarID`, проверка наличия `return` |
+| — | `VisitFuncBlock` | новая `Function`-область, параметры объявляются как переменные (ID `0..arity-1`), обход тела, затем в `finally`: `LocalsCount = FreeVarID` и проверка наличия `return` |
 | `class` | `VisitClass` | разрешает базовый класс, создаёт `ClassSymbol`, входит в его область; **сначала** регистрирует все поля (`VisitVarDef` → `VarDefines`) и сигнатуры всех методов (`VisitFuncDeclWithoutBlock`), **затем** анализирует тела методов |
 | `var` | `VisitVarDef` | в теле класса — только запоминает в `VarDefines`; иначе выводит тип, сверяет с аннотацией, создаёт `VarSymbol`, глобальные добавляет в `GlobalVariables` |
-| присваивание | `VisitVarAssigment` | только `=`; цель — `VarSymbol`; точное совпадение типов |
+| присваивание | `VisitVarAssignment` | только `=`; цель — `VarSymbol`; точное совпадение типов |
 | `return` | `VisitReturn` | тип значения (или `void`) должен совпасть с типом возврата функции |
 | `if` | `VisitIf` | условие типа `bool`, тело в новой `Local`-области |
 | `{ }` | `VisitBlock` | новая `Local`-область |
 | выражение | `VisitStatementExpression` | разрешает выражение |
 
 Выражения, присваивания, `if` и `return` требуют `currentFunction != null` (`ensureFunc`).
+
+Проверка `return` в блоке `finally` подменяет любую ошибку из тела не-`void`-функции
+([#8](https://github.com/slnxCS/PettyCompiler/issues/8)).
 
 #### Разрешение выражений (`ResolveExpression`)
 
@@ -376,14 +411,16 @@ FunctionParameter                 Name, Position, Type
 ### 7.1. `CompileFabric` и `HeaderCompiler`
 
 `CompileFabric.Build(analyzer)` создаёт `Compiler` и вызывает `Compile(new HeaderCompiler())`.
-`HeaderCompiler.Compile()` записывает сигнатуру, версию байткода и **весь пул констант** — поэтому пул
-должен быть полностью собран *до* генерации кода (что выполняется: константы добавляются при создании
+`HeaderCompiler.Compile(constantPool)` записывает сигнатуру, версию байткода и **весь пул констант** — поэтому
+пул должен быть полностью собран *до* генерации кода (что выполняется: константы добавляются при создании
 символов-литералов во время анализа).
 
 ### 7.2. `Compiler`
 
 Код накапливается в `List<byte> compiled`. Методы `Emit(int|float|string|OpCode|byte[])` дописывают
 байты (числа — little-endian через `BitConverter`, строки — UTF-8 без длины).
+`SetReservedBytes(startPos, bytes)` перезаписывает уже выданные байты на месте (через
+`CollectionsMarshal.AsSpan`) — так заполняется зарезервированная длина функции.
 
 `Compile()` формирует файл в порядке:
 
@@ -404,7 +441,7 @@ FunctionParameter                 Name, Position, Type
 | `x = v` | `<v>; STORE_LOCAL/STORE_GLOBAL id` |
 | `a.b.f = v` | `<v>; <a.b>; STORE_FIELD id(f)` — `CompileIdentifierExpressionWithoutLast` загружает объект-владелец |
 | `return v` | `<v>; RET` |
-| `if c : {…}` | `<c>; JMP_IF_FALSE <addr>; <тело>` — адрес вставляется задним числом (`InsertRange`) и равен **абсолютному смещению в файле** первого байта после тела |
+| `if c : …` | `<c>; JMP_IF_FALSE <addr>; <тело>` — адрес вставляется задним числом (`InsertRange`) и равен **абсолютному смещению в файле** первого байта после тела |
 | `{ … }` | инструкции блока подряд |
 | `func`, `class` | ничего (тела выводятся в своих секциях) |
 | выражение | код выражения |
@@ -416,7 +453,7 @@ FunctionParameter                 Name, Position, Type
 | литерал | `PUSH_CONSTANT idx` |
 | переменная | `LOAD_LOCAL id` / `LOAD_GLOBAL id` / `LOAD_FIELD id` (объект уже на стеке) |
 | `a op b` | `<a>; <b>; <OP>` — opcode выбирает `CompileBinaryOperation` типа левого операнда |
-| `v as T` | `<v>; CAST_…` (или ничего при приведении к тому же типу) |
+| `v as T` | `<v>; CAST_…`; при приведении к тому же типу сейчас не генерируется ничего, даже `<v>` ([#7](https://github.com/slnxCS/PettyCompiler/issues/7)) |
 | `f(a, b)` | `<a>; <b>; CALL id arity` (или `SYS_CALL` для встроенных) |
 | `obj.m(a)` | `<obj>; <a>; CALL_METHOD id arity+1` — `obj` становится аргументом `self` |
 | `C()` | `ALLOCATE_OBJ classId; CALL_METHOD baseCtorId 1` |
@@ -428,16 +465,17 @@ FunctionParameter                 Name, Position, Type
 
 ### 7.5. Тела функций
 
-`WriteFunctions` для каждой перегрузки выводит:
+`WriteFunctions` (обе перегрузки: для функций верхнего уровня и для методов) для каждой функции выводит:
 
 ```
+<длина тела: i32>          ; резервируется Emit(0), заполняется SetReservedBytes в конце
 RESERVE_LOCALS <LocalsCount>
 <тело: инструкции AST или EmitBytes(compiler)>
 RET
-HALT
 ```
 
-`RET` в конце добавляется всегда (даже если тело уже закончилось `return`), `HALT` служит маркером конца функции.
+Длина — число байт **после** поля длины (от `RESERVE_LOCALS` до `RET` включительно). `RET` в конце добавляется
+всегда, даже если тело уже закончилось `return`.
 
 ### 7.6. Таблица классов
 
@@ -446,6 +484,6 @@ HALT
 
 ## 8. Тесты
 
-`Tests/PettyCompilerTests` ссылается на проект компилятора и тестирует `Lexer` и `Parser` напрямую.
-Для тестирования `Analyzer`/`Compiler` нужно учитывать статическое состояние (раздел 1): тесты,
-создающие несколько анализаторов в одном процессе, будут влиять друг на друга.
+`Tests/PettyCompilerTests` ссылается на проект компилятора. Лексер и парсер тестируются напрямую, семантика
+и генерация кода — через `Program.Start`, то есть весь конвейер целиком. Поскольку состояние компиляции не
+статическое, тесты независимы друг от друга. Подробнее — в [01 — Быстрый старт → Тесты](01-getting-started.md#тесты).

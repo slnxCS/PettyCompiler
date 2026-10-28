@@ -173,6 +173,26 @@ public class ParserTests
         Assert.That(@if.Block.Statements, Has.Length.EqualTo(1));
     }
 
+    [Test]
+    public void IfWithoutBraces()
+    {
+        var func = single<FuncDefineStatement>("func f() { if x == 1 : y(); z(); }");
+        Assert.That(func.Block.Statements, Has.Length.EqualTo(2));
+        var @if = (IfStatement)func.Block.Statements[0];
+        Assert.That(@if.Block.Statements, Has.Length.EqualTo(1));
+        Assert.That(render(((StatementExpression)@if.Block.Statements[0]).Expression), Is.EqualTo("y()"));
+    }
+
+    [Test]
+    public void NestedIfWithoutBraces()
+    {
+        var func = single<FuncDefineStatement>("func f() { if a == 1 : if b == 1 : c(); }");
+        var outer = (IfStatement)func.Block.Statements[0];
+        var inner = (IfStatement)outer.Block.Statements[0];
+        Assert.That(render(inner.Condition), Is.EqualTo("(b == 1)"));
+        Assert.That(inner.Block.Statements, Has.Length.EqualTo(1));
+    }
+
     [TestCase("return;", false)]
     [TestCase("return 1 + 2;", true)]
     public void ReturnStatement(string statement, bool hasValue)
@@ -219,7 +239,10 @@ public class ParserTests
     [TestCase("func f { }", "Expected '(' after function name")]
     [TestCase("func f(a) { }", "Expected ':' before parameter type")]
     [TestCase("func f(a : int32 { }", "Expected ')' after function parameters")]
-    [TestCase("func f() : int32", "Expected '{' before block")]
+    [TestCase("func f() : int32", "Expected '{' for start block")]
+    [TestCase("func f() print(1);", "Expected '{' for start block")]
+    [TestCase("func f() : int32 return 1;", "Expected '{' for start block")]
+    [TestCase("class A : B var x = 1;", "Expected '{' for start block")]
     [TestCase("class { }", "Expected class name")]
     [TestCase("class A { }", "Expected ':' after class name")]
     [TestCase("func f() { if x { } }", "Expected ':' after expression")]

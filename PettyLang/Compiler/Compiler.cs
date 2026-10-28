@@ -1,5 +1,7 @@
+using System.Buffers;
 using System.Numerics;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using PettyLang.AST;
 using PettyLang.Errors;
@@ -206,6 +208,7 @@ public class Compiler
 
     void CompileStatement(Statement st)
     {
+        
         switch (st)
         {
             case ReturnStatement ret :
@@ -296,16 +299,27 @@ public class Compiler
         for (int i = 0; i < functions.Count; i++)
         {
             var func = functions[i];
+            var oldCount = compiled.Count;
+            Emit(0); // reserve bytes for function length
             Emit(OpCode.RESERVE_LOCALS);
             Emit(func.LocalsCount);
             if (func.Statement != null)
                 CompileStatements(func.Statement.Block.Statements);
-            else 
+            else
                 func.EmitBytes!(this);
             Emit(OpCode.RET);
-            Emit(OpCode.HALT);
+            var newCount = compiled.Count;
+            var funcLength = newCount - oldCount - 4;
+            SetReservedBytes(oldCount, BitConverter.GetBytes(funcLength));
         }
 
+    }
+
+    private void SetReservedBytes(int startPos, byte[] bytes)
+    {
+        if (bytes == null || bytes.Length == 0) return;
+        Span<byte> compiledSpan = CollectionsMarshal.AsSpan(compiled);
+        bytes.AsSpan().CopyTo(compiledSpan.Slice(startPos));
     }
 
     private void WriteFunctions(List<FuncDefineStatement> functions) {
@@ -316,11 +330,15 @@ public class Compiler
         for (int i = 0; i < functions.Count; i++)
         {
             var func = functions[i];
+            var oldCount = compiled.Count;
+            Emit(0); // reserve bytes for function length
             Emit(OpCode.RESERVE_LOCALS);
             Emit(func.Resolved!.LocalsCount);
             CompileStatements(func.Block.Statements);
             Emit(OpCode.RET);
-            Emit(OpCode.HALT);
+            var newCount = compiled.Count;
+            var funcLength = newCount - oldCount - 4;
+            SetReservedBytes(oldCount, BitConverter.GetBytes(funcLength));
         }
 
     }
