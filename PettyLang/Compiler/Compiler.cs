@@ -248,9 +248,9 @@ public class Compiler
         CompileExpression(statement.Condition);
         Emit(OpCode.JMP_IF_FALSE);
         var oldLen = compiled.Count;
+        Emit(0);
         CompileStatements(statement.Block.Statements);
-        var newLen = compiled.Count + 4;
-        compiled.InsertRange(oldLen, BitConverter.GetBytes(newLen));
+        SetReservedBytes(oldLen, BitConverter.GetBytes(oldLen + 4));
     }
 
     void CompileStatements(Statement[] sts)
