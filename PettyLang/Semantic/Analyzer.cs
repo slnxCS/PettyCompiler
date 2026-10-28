@@ -408,7 +408,7 @@ public class Analyzer
         else
         {
             resolvedType = GetSymType(ResolveIdentifierExpression(varDecl.Type!));
-            resolved = resolvedType.GetInstance(resolvedType.Members, resolvedType.Position, this);
+            resolved = resolvedType.ResolveDefaultValue(this, varDecl.Position, currentScope);
         }
 
 

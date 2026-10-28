@@ -90,7 +90,7 @@ public class Program
                 catch(Error error)
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine(error.ToString());
+                    Console.WriteLine(error.Message);
                     Console.ResetColor();
                     return;
                 }

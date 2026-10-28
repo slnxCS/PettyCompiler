@@ -55,10 +55,10 @@ public class Compiler
     public Compiler(Statement[] AST, Analyzer analyzer)
     {
         ASTNodes = AST;
-        this.analyzer = analyzer;
+        Analyzer = analyzer;
     }
 
-    private readonly Analyzer analyzer;
+    public readonly Analyzer Analyzer;
 
     private readonly Statement[] ASTNodes;
     public List<byte> compiled = new();
@@ -88,13 +88,12 @@ public class Compiler
         compiled.AddRange(bytes);
     }
 
-    public int GlobalsLenght { get; private set; } = 0;
-
     void CompileVarDef(VarDeclStatement var)
     {
         if (!var.Resolved.IsGlobal)
         {
-            CompileExpression(var.Value);
+            if (var.Value != null) CompileExpression(var.Value);
+            else Emit(var.Resolved.Type.GetDefaultValueBytes(this, var.Position));
             Emit(OpCode.STORE_LOCAL);
             Emit(var.Resolved.ID);
         }
@@ -263,10 +262,11 @@ public class Compiler
 
     private void WriteGlobals()
     {
-        Emit(analyzer.GlobalVariables.Count);
-        foreach (var global in analyzer.GlobalVariables)
+        Emit(Analyzer.GlobalVariables.Count);
+        foreach (var global in Analyzer.GlobalVariables)
         {
-            CompileExpression(global.Value);
+            if (global.Value != null) CompileExpression(global.Value);
+            else Emit(global.Resolved.Type.GetDefaultValueBytes(this, global.Position));
             Emit(OpCode.STORE_GLOBAL);
             Emit(global.Resolved.ID);
         }
@@ -286,7 +286,7 @@ public class Compiler
 
     private void SortClassesByID()
     {
-        analyzer.Classes = analyzer.Classes.OrderBy(x => x.Resolved?.ID 
+        Analyzer.Classes = Analyzer.Classes.OrderBy(x => x.Resolved?.ID 
             ?? throw new Error($"Class '{x.Name}' is not resolved", "compiler", x.Position)).ToList();
     }
 
@@ -345,13 +345,13 @@ public class Compiler
 
     private void WriteClasses()
     {
-        Emit(analyzer.Classes.Count);
+        Emit(Analyzer.Classes.Count);
 
         SortClassesByID();
         
-        for (int i = 0; i < analyzer.Classes.Count; i++)
+        for (int i = 0; i < Analyzer.Classes.Count; i++)
         {
-            var @class = analyzer.Classes[i];
+            var @class = Analyzer.Classes[i];
             if (@class.Resolved == null)
                 throw new Error($"Class '{@class.Name}' is not resolved", "compiler", @class.Position);
 
@@ -360,8 +360,8 @@ public class Compiler
             Emit(@class.Resolved.ID);
             Emit(@class.Resolved.Derived?.ID ?? -1);
             Emit(@class.Resolved.VarDefines.Count);
-            if (analyzer.Methods.ContainsKey(@class.Resolved))
-                WriteFunctions(analyzer.Methods[@class.Resolved]);
+            if (Analyzer.Methods.ContainsKey(@class.Resolved))
+                WriteFunctions(Analyzer.Methods[@class.Resolved]);
             else Emit(0);
         }
     }
@@ -369,18 +369,18 @@ public class Compiler
     public byte[] Compile(HeaderCompiler headerCompiler)
     {
         compiled.Clear();
-        compiled.AddRange(headerCompiler.Compile(analyzer.ConstantPool));
-        WriteFunctions(analyzer.Functions);
+        compiled.AddRange(headerCompiler.Compile(Analyzer.ConstantPool));
+        WriteFunctions(Analyzer.Functions);
         WriteClasses();
 
         
         WriteGlobals();
         CompileStatements(ASTNodes);
         Emit(OpCode.CALL);
-        if (analyzer.MainFunction == null)
+        if (Analyzer.MainFunction == null)
             throw new Error("Missing main function (entry point)", "compiler", default);
-        Emit(analyzer.MainFunction.ID);
-        Emit(analyzer.MainFunction.Arity);
+        Emit(Analyzer.MainFunction.ID);
+        Emit(Analyzer.MainFunction.Arity);
         Emit(OpCode.HALT);
         return compiled.ToArray();
     }

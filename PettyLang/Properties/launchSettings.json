@@ -2,7 +2,7 @@
   "profiles": {
     "PettyLang": {
       "commandName": "Project",
-      "commandLineArgs": "-i /home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/code.pt -o /home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/compiled.pt"
+      "commandLineArgs": "-i /home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/code.pt -o /home/slnx/PettyLang/Compiler/PettyLang/bin/Debug/net10.0/compiled.pt -d"
     }
   }
 }
